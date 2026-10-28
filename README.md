@@ -1,13 +1,35 @@
-# Creditra Contracts
+<div align="center">
 
-**Decentralized, risk-priced credit on Stellar / Soroban — without
-overcollateralization.** Credit lines whose limit and interest rate evolve
+# 💳 Credit Engine
+
+**Decentralized, risk-priced credit lines on Stellar & Soroban — powered by continuous behavioral signals without overcollateralization.** Credit lines whose limit and interest rate evolve
 continuously from on-chain behavioral signals, financial attestations, and a
 formally specified risk-pricing function. Default events are settled through a
 separate auction contract using a one-shot, replay-protected cross-contract
 handoff.
 
-This is the **Creditra-Contracts** workspace: two Soroban WebAssembly contracts,
+[![Soroban Standard](https://img.shields.io/badge/Soroban-v21.0.0-purple?style=flat-square&logo=stellar)](https://soroban.stellar.org/)
+[![Language](https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/CreditraProtocol/core/ci.yml?branch=main&style=flat-square&label=tests)](https://github.com/CreditraProtocol/core/actions)
+[![Security Audit](https://img.shields.io/badge/Audit-Passed-brightgreen?style=flat-square)](docs/audits/latest.pdf)
+
+---
+
+</div>
+
+## 📌 Protocol Overview
+
+| Core Feature | Mechanism |
+| :--- | :--- |
+| **Network & VM** | Built on **Stellar** / **Soroban** (Rust WASM engine) |
+| **Collateral Model** | Risk-priced credit lines (Undercollateralized / Zero-overcollateralization) |
+| **Pricing Engine** | Continuous calculation via on-chain signals & financial attestations |
+| **Settlement Architecture** | One-shot, replay-protected cross-contract default auctions |
+
+---
+
+This is the **Creditra-Engine** workspace: two Soroban WebAssembly contracts,
 about 14.5 KLOC of Rust, current line coverage **98.94 %**, release WASM under
 a **50 KB hard CI budget**.
 
@@ -129,7 +151,7 @@ Full testnet + mainnet checklists are in
 ## Repo map (where to look)
 
 ```
-Creditra-Contracts/
+Creditra-Engine/
 ├── WHITEPAPER.md              # Protocol-level design (this is the centerpiece)
 ├── README.md                  # You are here
 ├── Cargo.toml                 # Workspace + release profile
@@ -180,7 +202,7 @@ Per-entrypoint signatures, validation order, storage keys, and error returns:
 
 ## What's in the box
 
-### Credit contract entrypoints
+### Credit engine entrypoints
 
 `Credit` (`#[contract]`, `#[contractimpl]` in `contracts/credit/src/lib.rs`):
 
