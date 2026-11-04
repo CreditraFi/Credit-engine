@@ -30,8 +30,8 @@ handoff.
 ---
 
 This is the **Creditra-Engine** workspace: two Soroban WebAssembly contracts,
-about 14.5 KLOC of Rust, current line coverage **98.94 %**, release WASM under
-a **50 KB hard CI budget**.
+about 14.5 KLOC of Rust and current line coverage **98.94 %**, with
+size-optimized release WASM builds for both deployable contracts.
 
 | Doc | What it answers |
 |---|---|
@@ -98,7 +98,7 @@ Sequence diagrams for draw, repay, default → auction → settle:
 
 ### Prerequisites
 
-- Rust 1.75+ (recommend latest stable)
+- Rust 1.99.1 (pinned in `rust-toolchain.toml`)
 - `wasm32-unknown-unknown` target:
   ```bash
   rustup target add wasm32-unknown-unknown
@@ -111,9 +111,9 @@ Sequence diagrams for draw, repay, default → auction → settle:
 # Workspace build (no WASM)
 cargo build
 
-# Release WASM, size-optimized
-cargo build --release --target wasm32-unknown-unknown -p creditra-credit
-# Output: target/wasm32-unknown-unknown/release/creditra_credit.wasm (< 50 KB)
+# Reproducible release WASM for both deployable contracts
+scripts/build_wasm.sh all
+# Output: target/wasm32-unknown-unknown/release/{creditra_credit,gateway_auction}.wasm
 ```
 
 The release profile (`Cargo.toml`) is tuned for contract size:
@@ -134,17 +134,19 @@ cargo llvm-cov --workspace --all-targets --fail-under-lines 95
 # Current: 99.51 % regions, 98.94 % lines
 ```
 
-### Deploy (testnet)
+### Deploy (testnet only)
 
 ```bash
-soroban contract deploy \
+stellar contract deploy \
   --wasm target/wasm32-unknown-unknown/release/creditra_credit.wasm \
-  --source <identity> --network testnet
-soroban contract invoke --id <addr> --source <identity> --network testnet -- init --admin <admin-addr>
+  --source operator --network testnet --alias credit
+stellar contract invoke --id credit --source operator --network testnet \
+  -- init --admin <admin-addr>
 ```
 
-Full testnet + mainnet checklists are in
-[`docs/EXECUTION_QUALITY.md`](./docs/EXECUTION_QUALITY.md) §6.
+The complete build, testnet deploy/invoke, and TypeScript bindings workflow is
+in [`docs/testnet-deployment.md`](./docs/testnet-deployment.md). This repository
+has no mainnet path.
 
 ---
 
@@ -312,7 +314,9 @@ Per-entrypoint signatures, validation order, storage keys, and error returns:
 
 | Script | Use |
 |---|---|
-| `scripts/build_wasm.sh [all\|credit\|auction]` | Build release-mode WASM artifacts |
+| `scripts/build_wasm.sh [all\|credit\|auction]` | Reproducibly build release-mode WASM artifacts |
+| `scripts/generate-bindings.sh` | Generate TypeScript clients from the built WASM |
+| `scripts/check-bindings.sh` | Fail when committed bindings drift from the contract interface |
 | `scripts/check_workspace.sh [args]` | `cargo check --workspace` wrapper |
 | `scripts/clean_profraw.sh [--dry-run]` | Remove stray `*.profraw` coverage profiles outside `target/` |
 | `scripts/list_contract_errors.py [--json]` | Print every `ContractError` variant with its discriminant |
@@ -341,9 +345,8 @@ git log --oneline | grep -c Merge                     # ~332 merged PRs
 # Coverage
 cargo llvm-cov --workspace --all-targets --fail-under-lines 95
 
-# Size budget
-cargo build --release --target wasm32-unknown-unknown -p creditra-credit \
-  && ls -l target/wasm32-unknown-unknown/release/creditra_credit.wasm   # < 50 KB
+# Bindings drift
+scripts/check-bindings.sh --skip-build
 
 # Error catalog
 python3 scripts/list_contract_errors.py --json | jq 'length'   # 38

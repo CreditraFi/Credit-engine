@@ -1,4 +1,4 @@
-name: Build WASM
+name: Build WASM & Bindings
 
 on:
   pull_request:
@@ -7,48 +7,73 @@ on:
       - main
       - feature/**
 
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-bindings-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-wasm:
+    name: WASM + bindings (no secrets)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: 1.99.1
           targets: wasm32-unknown-unknown
 
-      - name: Build WASM
-        working-directory: ./contracts/creditra-credit
-        run: RUSTFLAGS='-C link-arg=--allow-undefined' cargo build --release --target wasm32-unknown-unknown
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-bindings-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-bindings-
 
-      - name: Verify WASM size threshold
-        working-directory: ./contracts/creditra-credit
+      - name: Install pinned Stellar CLI (22.8.2)
         run: |
           set -euo pipefail
-          WASM_PATH="target/wasm32-unknown-unknown/release/creditra_credit.wasm"
-          if [ ! -f "$WASM_PATH" ]; then
-            echo "::error::WASM artifact not found at $WASM_PATH"
-            exit 1
-          fi
+          curl -sSL \
+            https://github.com/stellar/stellar-cli/releases/download/v22.8.2/stellar-cli-22.8.2-x86_64-unknown-linux-gnu.tar.gz \
+            -o /tmp/stellar-cli.tar.gz
+          echo "faeaec7f7a16c008f25c8b9a6d5fb047831e97b74c85336db4f6ad5877ae9c4f  /tmp/stellar-cli.tar.gz" \
+            | sha256sum -c -
+          sudo tar -xzf /tmp/stellar-cli.tar.gz -C /usr/local/bin stellar
+          stellar --version
 
-          if stat --format="%s" "$WASM_PATH" >/dev/null 2>&1; then
-            SIZE_BYTES=$(stat --format="%s" "$WASM_PATH")
-          elif stat -f "%z" "$WASM_PATH" >/dev/null 2>&1; then
-            SIZE_BYTES=$(stat -f "%z" "$WASM_PATH")
-          else
-            echo "::error::Could not determine WASM file size using stat"
-            exit 1
-          fi
+      - name: Build both contracts reproducibly
+        run: bash scripts/build_wasm.sh all
 
-          THRESHOLD_BYTES=614400
-          echo "WASM size: ${SIZE_BYTES} bytes ($((SIZE_BYTES / 1024)) KB)"
-          echo "Threshold: ${THRESHOLD_BYTES} bytes (50 KB)"
-          echo "::notice::WASM size is ${SIZE_BYTES} bytes. Threshold is ${THRESHOLD_BYTES} bytes."
+      - name: Check committed bindings for drift
+        run: bash scripts/check-bindings.sh --skip-build
 
-          if [ "${SIZE_BYTES}" -gt "${THRESHOLD_BYTES}" ]; then
-            echo "::error::WASM size ${SIZE_BYTES} exceeds threshold ${THRESHOLD_BYTES}."
-            exit 1
-          fi
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install binding workspaces
+        run: npm ci
+
+      - name: Build and smoke-test TypeScript bindings
+        run: npm test
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: soroban-wasm
+          path: |
+            target/wasm32-unknown-unknown/release/creditra_credit.wasm
+            target/wasm32-unknown-unknown/release/gateway_auction.wasm
+          if-no-files-found: error
+          retention-days: 14

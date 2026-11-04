@@ -102,7 +102,6 @@ mod amount_validation_tests;
 mod attestation;
 mod auth;
 mod borrow;
-mod penalties;
 mod collateral;
 #[path = "../../collateral/src/admin.rs"]
 mod collateral_admin;
@@ -115,13 +114,13 @@ mod handshake;
 pub mod instrument;
 mod lifecycle;
 mod oracles;
+mod penalties;
 
 #[path = "../../lifecycle/src/views.rs"]
 mod lifecycle_views;
 
 mod limits;
 pub mod math_utils;
-mod oracles;
 mod query;
 #[path = "../../query/src/views.rs"]
 mod query_views;
@@ -132,57 +131,6 @@ pub use crate::types::FreezeReason;
 mod scoring;
 mod storage;
 pub mod types;
-mod views;
-
-use soroban_sdk::{
-    contract, contractimpl, symbol_short, token, Address, BytesN, Env, Symbol, Vec,
-};
-
-use crate::auth::{require_admin, require_admin_auth};
-use crate::attestation::AttestationBatch;
-use crate::events::{
-    publish_admin_rotation_accepted, publish_admin_rotation_proposed,
-    publish_borrow_lifecycle_event, publish_borrower_blocked_event,
-    publish_borrower_frozen_event, publish_close_factor_bps_set_event,
-    publish_contract_upgraded_event, publish_credit_line_event,
-    publish_draw_reversed_event, publish_drawn_event, publish_interest_accrued_event,
-    publish_oracle_config_set_event, publish_oracle_price_accepted_event,
-    publish_oracle_quorum_config_set_event, publish_oracle_quorum_price_set_event,
-    publish_paused_event, publish_protocol_fee_bounds_set_event,
-    publish_protocol_fee_bps_set_event, publish_rate_formula_config_event,
-    publish_repayment_event, publish_token_rescued_event,
-    publish_treasury_withdrawal_executed, publish_treasury_withdrawal_proposed,
-    BorrowLifecycleEvent, BorrowLifecyclePhase, ContractUpgradedEvent,
-    CreditLineEvent, DrawReversedEvent, DrawnEvent, InterestAccruedEvent,
-    RepaymentEvent, TreasuryWithdrawalExecutedEvent, TreasuryWithdrawalProposedEvent,
-};
-use crate::math_utils::{compute_deviation_bps, mul_div, safe_mul_div, Rounding};
-use crate::penalties::LateFeeConfig;
-use crate::storage::{
-    admin_key, assert_not_paused, clear_borrower_frozen, clear_reentrancy_guard,
-    clear_pending_treasury_withdrawal, enforce_freeze_cooldown, get_borrower_by_credit_line_id,
-    get_borrower_frozen_until, get_credit_line as storage_get_credit_line,
-    get_last_draw_ts as storage_get_last_draw_ts, get_oracle_config, get_oracle_quorum_config,
-    get_pending_treasury_withdrawal, get_utilization_cap_bps as storage_get_utilization_cap_bps,
-    is_borrower_blocked as storage_is_borrower_blocked,
-    is_borrower_frozen as storage_is_borrower_frozen, persist_credit_line, proposed_admin_key,
-    proposed_at_key, rate_cfg_key, set_borrower_blocked as storage_set_borrower_blocked,
-    set_borrower_frozen_until, set_borrower_unblocked,
-    set_last_draw_ts as storage_set_last_draw_ts, set_oracle_config, set_oracle_quorum_config,
-    set_pending_treasury_withdrawal, set_reentrancy_guard,
-    set_utilization_cap_bps as storage_set_utilization_cap_bps, DataKey, MAX_ENUMERATION_LIMIT,
-};
-use crate::oracles::{resolve_quorum_price, MAX_ORACLE_FEEDS};
-use crate::types::{
-    ContractError, CreditLineData, CreditLinesPage, CreditStatus, GracePeriodConfig,
-    GraceWaiverMode, OracleConfig, ProtocolConfig, ProtocolSummary, ProtocolSummaryView,
-    ProofOfReserve, RateChangeConfig, RateFormulaConfig, TreasuryWithdrawalProposal,
-};
-
-use types::{ContractError, CreditLineData, CreditStatus, RateChangeConfig};
-use storage::{clear_reentrancy_guard, set_reentrancy_guard, rate_cfg_key, DataKey};
-use auth::require_admin_auth;
-
 
 #[cfg(test)]
 mod boundary_tests;
@@ -198,19 +146,19 @@ mod views_tests;
 #[path = "../proofs/prorate_interest.rs"]
 mod prorate_interest_proofs;
 
-use crate::auth::{require_admin, require_admin_auth};
 use crate::attestation::AttestationBatch;
+use crate::auth::{require_admin, require_admin_auth};
 use crate::events::{
     publish_admin_rotation_accepted, publish_admin_rotation_proposed,
-    publish_borrower_blocked_event, publish_borrower_frozen_event,
-    publish_close_factor_bps_set_event, publish_contract_upgraded_event,
-    publish_credit_line_event, publish_draw_reversed_event, publish_drawn_event,
-    publish_interest_accrued_event, publish_oracle_config_set_event,
-    publish_oracle_price_accepted_event, publish_oracle_quorum_config_set_event,
-    publish_oracle_quorum_price_set_event, publish_paused_event,
-    publish_protocol_fee_bounds_set_event, publish_protocol_fee_bps_set_event,
-    publish_rate_formula_config_event, publish_repayment_event, publish_token_rescued_event,
-    publish_treasury_withdrawal_executed, publish_treasury_withdrawal_proposed,
+    publish_borrow_lifecycle_event, publish_borrower_blocked_event, publish_borrower_frozen_event,
+    publish_close_factor_bps_set_event, publish_contract_upgraded_event, publish_credit_line_event,
+    publish_draw_reversed_event, publish_drawn_event, publish_interest_accrued_event,
+    publish_oracle_config_set_event, publish_oracle_price_accepted_event,
+    publish_oracle_quorum_config_set_event, publish_oracle_quorum_price_set_event,
+    publish_paused_event, publish_protocol_fee_bounds_set_event,
+    publish_protocol_fee_bps_set_event, publish_rate_formula_config_event, publish_repayment_event,
+    publish_token_rescued_event, publish_treasury_withdrawal_executed,
+    publish_treasury_withdrawal_proposed, BorrowLifecycleEvent, BorrowLifecyclePhase,
     ContractUpgradedEvent, CreditLineEvent, DrawReversedEvent, DrawnEvent, InterestAccruedEvent,
     RepaymentEvent, TreasuryWithdrawalExecutedEvent, TreasuryWithdrawalProposedEvent,
 };
@@ -228,7 +176,8 @@ use crate::storage::{
     set_borrower_blocked as storage_set_borrower_blocked, set_borrower_frozen_until,
     set_borrower_unblocked, set_last_draw_ts as storage_set_last_draw_ts, set_oracle_config,
     set_oracle_quorum_config, set_pending_treasury_withdrawal, set_reentrancy_guard,
-    set_utilization_cap_bps as storage_set_utilization_cap_bps, DataKey, MAX_ENUMERATION_LIMIT,
+    set_utilization_cap_bps as storage_set_utilization_cap_bps, DataKey, DrawAuditKey,
+    MAX_ENUMERATION_LIMIT,
 };
 use crate::types::{
     BorrowCapabilities, ContractError, CreditLineData, CreditLineSnapshot, CreditLinesPage,
@@ -236,9 +185,7 @@ use crate::types::{
     OracleQuorumConfig, ProofOfReserve, ProtocolConfig, ProtocolSummary, ProtocolSummaryView,
     QueryCapabilities, RateChangeConfig, RateFormulaConfig, TreasuryWithdrawalProposal,
 };
-use soroban_sdk::{
-    contract, contractimpl, symbol_short, token, Address, BytesN, Env, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, symbol_short, token, Address, BytesN, Env, Symbol, Vec};
 
 pub const CONTRACT_API_VERSION: (u32, u32, u32) = (1, 0, 0);
 
@@ -328,6 +275,45 @@ pub struct Credit;
 
 #[contractimpl]
 impl Credit {
+    /// One-time contract initialization.
+    ///
+    /// Stores the immutable admin address, seeds the global accumulators, and
+    /// applies conservative default collateral and close-factor settings.
+    /// A second call reverts with [`ContractError::AlreadyInitialized`].
+    pub fn init(env: Env, admin: Address) {
+        config::init(env, admin)
+    }
+
+    /// Commit an attestation batch for a borrower (admin only).
+    pub fn commit_attestation_batch(
+        env: Env,
+        borrower: Address,
+        merkle_root: BytesN<32>,
+        count: u32,
+    ) {
+        attestation::commit_attestation_batch(env, borrower, merkle_root, count)
+    }
+
+    /// Verify a Merkle inclusion proof against a borrower's attestation batch.
+    pub fn verify_attestation_proof(
+        env: Env,
+        borrower: Address,
+        leaf: BytesN<32>,
+        proof: Vec<BytesN<32>>,
+    ) -> bool {
+        attestation::verify_attestation_proof(env, borrower, leaf, proof)
+    }
+
+    /// Return the committed attestation batch for a borrower, if any.
+    pub fn get_attestation_batch(env: Env, borrower: Address) -> Option<AttestationBatch> {
+        attestation::get_attestation_batch(env, borrower)
+    }
+
+    /// Clear a borrower's attestation batch (admin only).
+    pub fn clear_attestation_batch(env: Env, borrower: Address) {
+        attestation::clear_attestation_batch(env, borrower)
+    }
+
     pub fn get_version() -> (u32, u32, u32) {
         (1, 0, 0)
     }
@@ -398,22 +384,6 @@ impl Credit {
     pub fn set_liquidity_source(env: Env, reserve_address: Address) {
         config::set_liquidity_source(env, reserve_address)
     }
-
-    /// Sets the minimum collateral ratio in basis points (admin only).
-    /// Set the minimum collateral ratio required for borrowing (admin only).
-    ///
-    /// # Arguments
-    /// * `ratio_bps` - The minimum collateral ratio in basis points (e.g., 15000 = 150%)
-    ///
-    /// # Errors
-    /// * Panics if caller is not admin (`ContractError::Unauthorized`)
-    /// * Panics if protocol is paused (`ContractError::ProtocolPaused`)
-    pub fn set_min_collateral_ratio_bps(env: Env, ratio_bps: u32) {
-        require_admin_auth(&env);
-        assert_not_paused(&env);
-        crate::storage::set_min_collateral_ratio_bps(&env, ratio_bps);
-    }
-
 
     /// Open a new credit line for a borrower (admin only).
     pub fn open_credit_line(
@@ -765,7 +735,12 @@ impl Credit {
             previous_utilized,
             Some(previous_status),
         );
-        lifecycle::advance_repayment_schedule_after_repay(&env, &borrower, effective_repay, interest_repaid);
+        lifecycle::advance_repayment_schedule_after_repay(
+            &env,
+            &borrower,
+            effective_repay,
+            interest_repaid,
+        );
 
         let _timestamp = env.ledger().timestamp();
         publish_interest_accrued_event(
@@ -1034,11 +1009,7 @@ impl Credit {
     /// - `env`: Soroban environment.
     /// - `borrower`: Borrower address to configure.
     /// - `grace_period_seconds`: Grace period duration in seconds. Pass `0` to remove.
-    pub fn set_borrower_liq_grace(
-        env: Env,
-        borrower: Address,
-        grace_period_seconds: u64,
-    ) {
+    pub fn set_borrower_liq_grace(env: Env, borrower: Address, grace_period_seconds: u64) {
         lifecycle::set_per_borrower_liquidation_grace(&env, borrower, grace_period_seconds);
     }
 
@@ -1398,7 +1369,11 @@ impl Credit {
     ///     let page2 = client.get_credit_lines_paginated(Some(cursor), 10);
     /// }
     /// ```
-    pub fn get_credit_lines_paginated(env: Env, cursor: Option<u32>, limit: u32) -> CreditLinesPage {
+    pub fn get_credit_lines_paginated(
+        env: Env,
+        cursor: Option<u32>,
+        limit: u32,
+    ) -> CreditLinesPage {
         views::get_credit_lines_paginated(env, cursor, limit)
     }
 
@@ -1884,7 +1859,10 @@ impl Credit {
             let auction_client = AuctionClient::new(&env, &auction_addr);
             // Version Handshake Check
             let remote_version = auction_client.get_version();
-            assert!(handshake::verify_version(&env, remote_version), "Incompatible Version");
+            assert!(
+                handshake::verify_version(&env, remote_version),
+                "Incompatible Version"
+            );
             let auction_recovered = auction_client.settle_default_liquidation(
                 &settlement_id,
                 &env.current_contract_address(),
@@ -2052,7 +2030,12 @@ impl Credit {
                 max_age_seconds,
             },
         );
-        publish_oracle_quorum_config_set_event(&env, min_quorum_k, max_deviation_bps, max_age_seconds);
+        publish_oracle_quorum_config_set_event(
+            &env,
+            min_quorum_k,
+            max_deviation_bps,
+            max_age_seconds,
+        );
     }
 
     /// Return the current multi-oracle quorum configuration, if set.
@@ -2087,9 +2070,8 @@ impl Credit {
         assert_not_paused(&env);
         require_admin_auth(&env);
 
-        let qcfg = get_oracle_quorum_config(&env).unwrap_or_else(|| {
-            env.panic_with_error(ContractError::OraclePriceInvalid)
-        });
+        let qcfg = get_oracle_quorum_config(&env)
+            .unwrap_or_else(|| env.panic_with_error(ContractError::OraclePriceInvalid));
 
         if prices.len() > oracles::MAX_ORACLE_FEEDS {
             env.panic_with_error(ContractError::OraclePriceInvalid);
@@ -4527,7 +4509,7 @@ mod test_mock_liquidity_token_extended {
         assert_eq!(cfg.rate_change_min_interval, 3600);
     }
 
-// ── Collateral risk weight tests ─────────────────────────────────────────────
+    // ── Collateral risk weight tests ─────────────────────────────────────────────
 
     #[test]
     #[should_panic(expected = "Error(Contract, #8)")]
@@ -5866,6 +5848,7 @@ mod test_max_draw_amount {
             let contract_id = env.register(Credit, ());
             let client = CreditClient::new(env, &contract_id);
             client.init(&admin);
+            let borrower = Address::generate(env);
             client.open_credit_line(&borrower, &1_000, &300_u32, &70_u32);
 
             client.draw_credit(&borrower, &100);

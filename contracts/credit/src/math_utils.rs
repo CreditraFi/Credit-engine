@@ -137,6 +137,34 @@ pub fn mul_div(a: u128, numerator: u128, denominator: u128, rounding: Rounding) 
     }
 }
 
+/// Checked variant of [`mul_div`] that returns `None` instead of panicking.
+///
+/// Returns `None` when the denominator is zero or when `a × numerator`
+/// overflows `u128`. Used by callers that map arithmetic failure to a
+/// structured [`crate::types::ContractError`] instead of a panic.
+pub fn safe_mul_div(
+    a: u128,
+    numerator: u128,
+    denominator: u128,
+    rounding: Rounding,
+) -> Option<u128> {
+    if denominator == 0 {
+        return None;
+    }
+    let product = a.checked_mul(numerator)?;
+    let quotient = product / denominator;
+    match rounding {
+        Rounding::Floor => Some(quotient),
+        Rounding::Ceil => {
+            if product % denominator != 0 {
+                quotient.checked_add(1)
+            } else {
+                Some(quotient)
+            }
+        }
+    }
+}
+
 /// Scale `amount` up by [`SCALE`] (multiply by 10^18).
 ///
 /// Used to convert a raw integer into a fixed-point representation before

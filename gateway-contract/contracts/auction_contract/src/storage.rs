@@ -88,7 +88,7 @@ pub(crate) fn bump_auction_state_ttl(env: &Env, auction_id: &Symbol) {
 }
 
 /// Extend TTL for settlement replay-protection markers (only when the key exists).
-pub(crate) fn bump_settlement_marker_ttl(env: &Env, key: &crate::AuctionKey) {
+pub(crate) fn bump_settlement_marker_ttl(env: &Env, key: &crate::SettlementKey) {
     if env.storage().persistent().has(key) {
         env.storage()
             .persistent()
@@ -474,11 +474,7 @@ pub fn auction_set_highest_bid(env: &Env, id: u32, bid: i128) {
 /// - **TTL bumped when**: key exists
 pub fn auction_is_claimed(env: &Env, id: u32) -> bool {
     let key = AuctionKey::Claimed(id);
-    let value = env
-        .storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or(false);
+    let value = env.storage().persistent().get(&key).unwrap_or(false);
     if env.storage().persistent().has(&key) {
         env.storage().persistent().extend_ttl(
             &key,

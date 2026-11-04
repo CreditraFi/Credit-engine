@@ -359,10 +359,6 @@ fn category_mappings_are_stable() {
         ContractErrorCategory::Limit
     );
     assert_eq!(
-//         ContractError::LimitDecreaseRequiresRepayment.category(),
-        ContractErrorCategory::Limit
-    );
-    assert_eq!(
         ContractError::DrawExceedsMaxAmount.category(),
         ContractErrorCategory::Limit
     );
