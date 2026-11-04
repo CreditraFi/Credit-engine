@@ -1,7 +1,13 @@
 # Deployment Guide
 
-This document describes the required deployment sequence for the Creditra
-Credit contract and the invariants that operators must maintain.
+> **Testnet only.** For reproducible builds, testnet deploy/invoke commands,
+> and TypeScript bindings generation, start with
+> [`docs/testnet-deployment.md`](./testnet-deployment.md). This repository has
+> no mainnet network option, deployment script, secret, wallet implementation,
+> or credential.
+
+This document describes the required post-deploy configuration sequence for
+the Creditra Credit contract and the invariants that operators must maintain.
 
 ---
 
@@ -47,9 +53,10 @@ pub fn init(env: Env, admin: Address)
 ### Example
 
 ```bash
-soroban contract invoke \
+stellar contract invoke \
   --id $CONTRACT_ID \
-  --source $DEPLOYER_KEY \
+  --source operator \
+  --network testnet \
   -- init \
   --admin $ADMIN_ADDRESS
 ```
@@ -62,9 +69,10 @@ Without a liquidity token, draw operations transfer no tokens (state-only
 accounting). Set the token before opening credit lines that will be drawn:
 
 ```bash
-soroban contract invoke \
+stellar contract invoke \
   --id $CONTRACT_ID \
-  --source $ADMIN_KEY \
+  --source operator \
+  --network testnet \
   -- set_liquidity_token \
   --token_address $TOKEN_ADDRESS
 ```
@@ -77,9 +85,10 @@ By default the contract itself is the liquidity reserve. To use an external
 reserve (e.g. a multisig treasury):
 
 ```bash
-soroban contract invoke \
+stellar contract invoke \
   --id $CONTRACT_ID \
-  --source $ADMIN_KEY \
+  --source operator \
+  --network testnet \
   -- set_liquidity_source \
   --reserve_address $RESERVE_ADDRESS
 ```
@@ -107,9 +116,10 @@ state completely unchanged.
 
 ```bash
 # A second init call should return Error(Contract, #14)
-soroban contract invoke \
+stellar contract invoke \
   --id $CONTRACT_ID \
-  --source $ANY_KEY \
+  --source operator \
+  --network testnet \
   -- init \
   --admin $ANY_ADDRESS
 # Expected: Error(Contract, #14)

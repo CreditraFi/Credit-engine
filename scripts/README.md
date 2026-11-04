@@ -8,7 +8,9 @@ they are operator-facing utilities only.
 
 | Script | Purpose |
 | ------ | ------- |
-| `build_wasm.sh` | Compile both workspace contracts to `target/wasm32-unknown-unknown/release/*.wasm`. |
+| `build_wasm.sh` | Reproducibly compile both deployable contracts to `target/wasm32-unknown-unknown/release/*.wasm` (`--check` verifies an existing build). |
+| `generate-bindings.sh` | Generate the TypeScript clients in `bindings/` from the built WASM using the pinned Stellar CLI. |
+| `check-bindings.sh` | Regenerate bindings into a temp directory and fail on drift from `bindings/`. |
 | `check-wasm-size.sh` | Build (optional) and fail when any release WASM exceeds **100 KiB** (`THRESHOLD_BYTES=102400`). |
 | `test_check_wasm_size.sh` | Focused guard tests for `check-wasm-size.sh` (synthetic artifacts, no build). |
 | `clean_profraw.sh` | Remove stray `*.profraw` coverage files left over by `cargo llvm-cov`. |

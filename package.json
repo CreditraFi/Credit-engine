@@ -1,0 +1,19 @@
+{
+  "name": "credit-engine-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reproducible Soroban contract builds and generated TypeScript clients for the Credit Engine.",
+  "type": "module",
+  "workspaces": [
+    "bindings/credit-engine",
+    "bindings/auction"
+  ],
+  "scripts": {
+    "build:bindings": "npm run build --workspaces",
+    "test:bindings": "npm run build:bindings && node --test bindings/smoke.test.mjs",
+    "test": "npm run test:bindings"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

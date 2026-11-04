@@ -62,6 +62,8 @@ Read in this order:
    payload field layouts, sample `getEvents` JSON.
 5. [`docs/storage-layout.md`](./storage-layout.md) — instance vs persistent
    storage tier reference.
+6. [`docs/testnet-deployment.md`](./testnet-deployment.md) — reproducible
+   WASM builds, testnet-only deploy/invoke, and generated TypeScript bindings.
 
 For the rate / accrual formulas:
 

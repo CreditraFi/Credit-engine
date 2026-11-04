@@ -184,9 +184,31 @@ pub struct DrawsFrozenEvent {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CreditLineFreezeEvent {
+    pub borrower: soroban_sdk::Address,
+    /// Structured reason for the freeze action.
+    pub reason: crate::types::FreezeReason,
+    /// `true` when frozen; `false` when unfrozen.
+    pub frozen: bool,
+    /// Ledger sequence at time of change (for off-chain indexers).
+    pub ledger: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BorrowerBlockedEvent {
     pub borrower: Address,
     pub blocked: bool,
+    pub ledger: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BorrowerFrozenEvent {
+    pub borrower: Address,
+    /// Timestamp (ledger seconds) until which draws are frozen.
+    pub frozen_until: u64,
+    /// Ledger sequence at time of change (for off-chain indexers)
     pub ledger: u32,
 }
 
@@ -199,6 +221,37 @@ pub struct DrawnEventV2 {
     pub amount: i128,
     pub new_utilized_amount: i128,
     pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FeeAccruedEvent {
+    pub borrower: Address,
+    /// Total protocol fee skimmed from the repayment.
+    pub fee_amount: i128,
+    /// Treasury portion of `fee_amount` credited to `TreasuryBalance`.
+    pub treasury_amount: i128,
+    /// Bounty pool portion of `fee_amount` credited to `BountyBalance`.
+    pub bounty_amount: i128,
+    pub new_treasury_balance: i128,
+    pub new_bounty_balance: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PenaltyRateEnteredEvent {
+    pub borrower: Address,
+    pub base_rate_bps: u32,
+    pub penalty_surcharge_bps: u32,
+    pub effective_rate_bps: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PenaltyRateExitedEvent {
+    pub borrower: Address,
+    pub previous_rate_bps: u32,
+    pub new_rate_bps: u32,
 }
 
 pub fn publish_credit_line_opened_event(env: &Env, event: CreditLineOpenedEvent) {
@@ -256,6 +309,20 @@ pub fn publish_fee_accrued_event(env: &Env, event: FeeAccruedEvent) {
         .publish((symbol_short!("credit"), symbol_short!("fee_accrd")), event);
 }
 
+pub fn publish_protocol_fee_bps_set_event(env: &Env, fee_bps: u32) {
+    env.events().publish(
+        (symbol_short!("credit"), Symbol::new(env, "fee_set")),
+        fee_bps,
+    );
+}
+
+pub fn publish_protocol_fee_bounds_set_event(env: &Env, min_bps: u32, max_bps: u32) {
+    env.events().publish(
+        (symbol_short!("credit"), Symbol::new(env, "fee_bnd")),
+        (min_bps, max_bps),
+    );
+}
+
 pub fn publish_admin_rotation_proposed(env: &Env, proposed_admin: &Address, accept_after: u64) {
     env.events().publish(
         (symbol_short!("credit"), Symbol::new(env, "admin_prop")),
@@ -305,6 +372,24 @@ pub fn publish_draws_frozen_event(env: &Env, frozen: bool, reason: crate::types:
     );
 }
 
+/// Publish a per-credit-line freeze/unfreeze event.
+pub fn publish_credit_line_freeze_event(
+    env: &Env,
+    borrower: &soroban_sdk::Address,
+    reason: crate::types::FreezeReason,
+    frozen: bool,
+) {
+    env.events().publish(
+        (symbol_short!("credit"), Symbol::new(env, "line_frz")),
+        CreditLineFreezeEvent {
+            borrower: borrower.clone(),
+            reason,
+            frozen,
+            ledger: env.ledger().sequence(),
+        },
+    );
+}
+
 pub fn publish_rate_formula_config_event(env: &Env, enabled: bool) {
     env.events().publish(
         (symbol_short!("credit"), Symbol::new(env, "rate_form")),
@@ -323,10 +408,7 @@ pub fn publish_default_liquidation_requested_event(
     );
 }
 
-pub fn publish_default_liquidation_settled_event(
-    env: &Env,
-    event: DefaultLiquidationSettledEvent,
-) {
+pub fn publish_default_liquidation_settled_event(env: &Env, event: DefaultLiquidationSettledEvent) {
     env.events().publish(
         (symbol_short!("credit"), Symbol::new(env, "liq_setl")),
         event,
@@ -339,7 +421,8 @@ pub fn publish_paused_event(env: &Env, paused: bool) {
     } else {
         Symbol::new(env, "unpaused")
     };
-    env.events().publish((symbol_short!("credit"), topic), paused);
+    env.events()
+        .publish((symbol_short!("credit"), topic), paused);
 }
 
 /// Publish a borrower blocked/unblocked event.
@@ -419,6 +502,25 @@ pub struct CollateralDepositedEvent {
     pub new_balance: i128,
 }
 
+/// Event emitted by [`crate::collateral::partial_release_collateral`].
+///
+/// Distinct from [`CollateralWithdrawnEvent`] so indexers can distinguish a
+/// borrower-initiated partial release (health-factor gated) from a generic
+/// withdrawal or an atomic repay-and-release.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CollateralPartialReleasedEvent {
+    /// Borrower whose collateral is being partially released.
+    pub borrower: Address,
+    /// Token amount returned to the borrower.
+    pub amount_released: i128,
+    /// Collateral balance remaining in the contract after the release.
+    pub new_balance: i128,
+    /// Health factor (collateral * 10_000 / utilized) after the release.
+    /// `u32::MAX` when `utilized_amount == 0` (fully repaid / unconstrained).
+    pub health_factor_bps: u32,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CollateralWithdrawnEvent {
@@ -489,6 +591,13 @@ pub fn publish_collateral_deposited_event(env: &Env, event: CollateralDepositedE
         .publish((symbol_short!("credit"), symbol_short!("col_dep")), event);
 }
 
+pub fn publish_collateral_partial_released_event(env: &Env, event: CollateralPartialReleasedEvent) {
+    env.events().publish(
+        (symbol_short!("credit"), Symbol::new(env, "col_prel")),
+        event,
+    );
+}
+
 pub fn publish_collateral_withdrawn_event(env: &Env, event: CollateralWithdrawnEvent) {
     env.events()
         .publish((symbol_short!("credit"), symbol_short!("col_wit")), event);
@@ -542,6 +651,34 @@ pub fn publish_oracle_price_accepted_event(env: &Env, price: i128, timestamp: u6
     );
 }
 
+/// Emit when `set_oracle_quorum_config` is called.
+pub fn publish_oracle_quorum_config_set_event(
+    env: &Env,
+    min_quorum_k: u32,
+    max_deviation_bps: u32,
+    max_age_seconds: u64,
+) {
+    env.events().publish(
+        (symbol_short!("credit"), Symbol::new(env, "orc_qcfg")),
+        (min_quorum_k, max_deviation_bps, max_age_seconds),
+    );
+}
+
+/// Emit when `submit_oracle_prices` successfully resolves a quorum price.
+///
+/// Data: `(resolved_price, min_quorum_k, timestamp)`.
+pub fn publish_oracle_quorum_price_set_event(
+    env: &Env,
+    price: i128,
+    quorum_k: u32,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (symbol_short!("credit"), Symbol::new(env, "orc_qprc")),
+        (price, quorum_k, timestamp),
+    );
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LateFeeChargedEvent {
@@ -572,8 +709,6 @@ pub fn publish_grace_waiver_applied_event(
         },
     );
 }
-
-
 
 /// Emitted when a treasury withdrawal is proposed via `propose_treasury_withdrawal`.
 #[contracttype]
