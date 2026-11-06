@@ -400,7 +400,7 @@ mod integration {
         let (env, contract_id, admin, _token) = setup_with_token(0_i128);
         let client = CreditClient::new(&env, &contract_id);
 
-        client.pause_protocol(&admin);
+        client.set_protocol_paused(&admin);
 
         let borrowers: Vec<Address> = Vec::new(&env);
 
