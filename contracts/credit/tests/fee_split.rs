@@ -22,7 +22,7 @@ fn setup<'a>(
     let borrower = Address::generate(env);
     let treasury = Address::generate(env);
     let bounty = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -45,6 +45,7 @@ fn setup<'a>(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prepare_repay<'a>(
     env: &Env,
     contract_id: &Address,
@@ -207,7 +208,7 @@ fn withdraw_bounty_without_address_reverts() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

@@ -11,8 +11,9 @@ use creditra_risk::{
     RiskContractClient,
 };
 use soroban_sdk::{
+    symbol_short,
     testutils::{Address as _, Events, Ledger},
-    symbol_short, Address, Env, IntoVal, Symbol, TryFromVal, TryIntoVal,
+    Address, Env, Symbol, TryFromVal, TryIntoVal,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -77,7 +78,10 @@ fn test_init_stores_admin() {
         })
         .expect("admin key must be set after init");
 
-    assert_eq!(retrieved, admin, "stored admin must match initialized value");
+    assert_eq!(
+        retrieved, admin,
+        "stored admin must match initialized value"
+    );
 }
 
 // ── Test: set_risk_admin_cooldown() event emission ───────────────────────
@@ -99,7 +103,7 @@ fn test_set_risk_admin_cooldown_publishes_event() {
     let event = events.get(0).unwrap();
     // event is (contract_id: Address, topics: Vec<Val>, data: Val)
     let topics = &event.1;
-    let data = event.2.clone();
+    let data = event.2;
     assert_eq!(
         Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap(),
         symbol_short!("risk"),
@@ -280,7 +284,7 @@ fn test_risk_admin_cooldown_configured_event_roundtrip() {
         .expect("rad_cool event must be present");
 
     // all_events entries are (contract_id, topics, data) tuples
-    let data = event.2.clone();
+    let data = event.2;
     let retrieved: RiskAdminCooldownConfiguredEvent = data.try_into_val(&env).unwrap();
 
     assert_eq!(

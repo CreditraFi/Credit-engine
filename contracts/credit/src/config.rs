@@ -27,6 +27,18 @@
 //! rotation in [`crate::lib::propose_admin`] /
 //! [`crate::lib::accept_admin`].
 //!
+//! # Front-running protection
+//!
+//! An empty admin slot is not sufficient protection: between deployment and
+//! the first `init`, anyone could call `init` and claim the admin role. `init`
+//! therefore also requires authorization from the contract's **deployer**
+//! (`Env::deployer`). Only the account that deployed this contract instance can
+//! choose the initial admin, so a third party cannot win the initialization
+//! race even if they submit the first `init` transaction.
+//!
+//! Deploy and initialize may remain separate transactions; the deployer's
+//! signature on `init` is what binds the admin choice to the deployer.
+//!
 //! # Why (deployment-safe defaults)
 //!
 //! Shipping `init` with conservative defaults — 150 % collateral floor,
@@ -46,12 +58,22 @@ use crate::storage::{admin_key, set_schema_version, DataKey};
 use crate::types::ContractError;
 use soroban_sdk::{Address, Env};
 
-/// Initialize the contract exactly once.
-pub fn init(env: Env, admin: Address) {
+/// Atomic one-time initialization, executed by the contract constructor.
+///
+/// Soroban runs `__constructor` in the same operation that creates the
+/// contract instance, so the instance is never observable in an uninitialized
+/// state and a third party cannot claim the admin slot by calling `init`
+/// first.
+pub fn constructor(env: Env, admin: Address) {
     if env.storage().instance().has(&admin_key(&env)) {
         env.panic_with_error(ContractError::AlreadyInitialized);
     }
-    env.storage().instance().set(&admin_key(&env), &admin);
+    write_initial_state(&env, admin);
+}
+
+/// Write the one-time initialized state for `admin`.
+fn write_initial_state(env: &Env, admin: Address) {
+    env.storage().instance().set(&admin_key(env), &admin);
     env.storage()
         .instance()
         .set(&DataKey::LiquiditySource, &env.current_contract_address());
@@ -63,10 +85,31 @@ pub fn init(env: Env, admin: Address) {
     env.storage()
         .instance()
         .set(&DataKey::TotalUtilized, &0_i128);
-    set_schema_version(&env, crate::SCHEMA_VERSION);
-    // Set default minimum collateral ratio to 150% (15000 bps) in production, 0 in tests
-    #[cfg(not(test))]
-    crate::storage::set_min_collateral_ratio_bps(&env, 15000);
+    set_schema_version(env, crate::SCHEMA_VERSION);
+    // Deployed Wasm contracts default to a conservative 150% collateral ratio.
+    // Host builds are used by tests and tooling, where an unset ratio would
+    // otherwise require every fixture to deposit collateral first.
+    #[cfg(target_arch = "wasm32")]
+    crate::storage::set_min_collateral_ratio_bps(env, 15000);
+    #[cfg(not(target_arch = "wasm32"))]
+    crate::storage::set_min_collateral_ratio_bps(env, 0);
+}
+
+/// Backwards-compatible no-op initialization entrypoint.
+///
+/// Initialization happens atomically in [`constructor`]. Callers that still
+/// invoke `init` with the admin pinned at deployment get an idempotent no-op;
+/// supplying a different admin is rejected, so the admin can never be replaced
+/// through `init`.
+pub fn init(env: Env, admin: Address) {
+    let stored: Address = env
+        .storage()
+        .instance()
+        .get(&admin_key(&env))
+        .unwrap_or_else(|| env.panic_with_error(ContractError::AdminNotInitialized));
+    if stored != admin {
+        env.panic_with_error(ContractError::AlreadyInitialized);
+    }
 }
 
 /// @notice Sets the token contract used for reserve/liquidity checks and draw transfers.

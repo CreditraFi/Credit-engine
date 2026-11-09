@@ -2,6 +2,7 @@
 
 //! Focused cross-contract conservation tests for Credit + Auction settlement.
 
+use soroban_sdk::testutils::Ledger;
 use creditra_credit::types::CreditStatus;
 use creditra_credit::{Credit, CreditClient};
 use gateway_auction::{Auction, AuctionClient, AuctionMode, AuctionError};
@@ -24,11 +25,11 @@ struct Deployment {
 
 fn setup_test(env: &Env, draw_amount: i128) -> Deployment {
     env.mock_all_auths_allowing_non_root_auth();
-    env.ledger().set_timestamp(START_TS);
+    env.ledger().with_mut(|l| l.timestamp = START_TS);
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let credit_id = env.register(Credit, ());
+    let credit_id = env.register(Credit, (admin.clone(),));
     let auction_id = env.register(Auction, ());
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(env));
     let token_address = token_id.address();
@@ -107,7 +108,7 @@ fn test_conservation_under_full_liquidation() {
     // Bidder places bid of 1500
     auction.place_bid(&settlement_id, &bidder, &1_500);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
     auction.close_auction(&settlement_id);
 
     // Settle default liquidation via credit contract
@@ -161,7 +162,7 @@ fn test_conservation_under_partial_liquidation() {
     // Bidder places bid of 800
     auction.place_bid(&settlement_id, &bidder, &800);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
     auction.close_auction(&settlement_id);
 
     // Settle default liquidation via credit contract
@@ -211,7 +212,7 @@ fn test_claim_settled_liquidation_is_prevented() {
 
     auction.place_bid(&settlement_id, &bidder, &1_000);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
     auction.close_auction(&settlement_id);
 
     // Settle default liquidation

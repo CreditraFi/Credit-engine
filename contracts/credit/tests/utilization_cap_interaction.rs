@@ -9,7 +9,7 @@ fn setup_with_credit_line(env: &Env, credit_limit: i128) -> (CreditClient<'_>, A
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 

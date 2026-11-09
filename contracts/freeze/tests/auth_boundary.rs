@@ -48,7 +48,7 @@ fn setup(env: &Env) -> (CreditClient<'_>, Address, Address) {
     env.ledger().with_mut(|li| li.timestamp = START_TS);
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
@@ -63,7 +63,7 @@ fn setup_no_mock(env: &Env) -> (CreditClient<'_>, Address, Address, Address) {
     env.ledger().with_mut(|li| li.timestamp = START_TS);
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
@@ -86,7 +86,7 @@ fn mock_admin_freeze_draws<'a>(
                 sub_invokes: &[],
             },
         }])
-        .freeze_draws();
+        .freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 }
 
 fn mock_admin_freeze_credit_line<'a>(
@@ -140,11 +140,14 @@ fn freeze_draws_authorized_records_admin_auth() {
     let env = Env::default();
     let (client, admin, _borrower) = setup(&env);
 
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     let auths = env.auths();
     assert_eq!(auths.len(), 1, "freeze_draws must record exactly one auth");
-    assert_eq!(auths[0].0, admin, "freeze_draws must be authorized by admin");
+    assert_eq!(
+        auths[0].0, admin,
+        "freeze_draws must be authorized by admin"
+    );
     assert!(client.is_draws_frozen());
 }
 
@@ -152,13 +155,20 @@ fn freeze_draws_authorized_records_admin_auth() {
 fn unfreeze_draws_authorized_records_admin_auth() {
     let env = Env::default();
     let (client, admin, _borrower) = setup(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     client.unfreeze_draws();
 
     let auths = env.auths();
-    assert_eq!(auths.len(), 1, "unfreeze_draws must record exactly one auth");
-    assert_eq!(auths[0].0, admin, "unfreeze_draws must be authorized by admin");
+    assert_eq!(
+        auths.len(),
+        1,
+        "unfreeze_draws must record exactly one auth"
+    );
+    assert_eq!(
+        auths[0].0, admin,
+        "unfreeze_draws must be authorized by admin"
+    );
     assert!(!client.is_draws_frozen());
 }
 
@@ -253,7 +263,7 @@ fn unfreeze_borrower_authorized_records_admin_auth() {
 fn freeze_draws_reverts_without_auth() {
     let env = Env::default();
     let (client, _contract_id, _admin, _borrower) = setup_no_mock(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 }
 
 #[test]
@@ -328,7 +338,7 @@ fn freeze_draws_wrong_signer_reverts() {
                 sub_invokes: &[],
             },
         }])
-        .freeze_draws();
+        .freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 }
 
 #[test]
@@ -451,7 +461,7 @@ fn unfreeze_borrower_wrong_signer_reverts() {
 fn is_draws_frozen_requires_no_auth() {
     let env = Env::default();
     let (client, _admin, _borrower) = setup(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     let _ = client.is_draws_frozen();
     assert!(
@@ -464,7 +474,7 @@ fn is_draws_frozen_requires_no_auth() {
 fn get_draws_freeze_reason_requires_no_auth() {
     let env = Env::default();
     let (client, _admin, _borrower) = setup(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     let _ = client.get_draws_freeze_reason();
     assert!(

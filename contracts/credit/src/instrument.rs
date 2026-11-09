@@ -26,12 +26,19 @@
 
 #![cfg(not(target_arch = "wasm32"))]
 
+extern crate std;
+
 use soroban_sdk::{
     testutils::{budget::Budget, Address as _},
     token, Address, Env,
 };
 
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::Path,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Relative path (from the `creditra-credit` crate root) to the pinned snapshot.
 pub const SNAPSHOT_REL_PATH: &str = "test_snapshots/budget.json";
@@ -53,6 +60,7 @@ pub mod entrypoint {
     pub const SET_CREDIT_LIMIT_BOUNDS: &str = "set_credit_limit_bounds";
     pub const SET_UTILIZATION_CAP: &str = "set_utilization_cap";
     pub const DEPOSIT_COLLATERAL: &str = "deposit_collateral";
+    pub const PARTIAL_RELEASE_COLLATERAL: &str = "partial_release_collateral";
     pub const WITHDRAW_COLLATERAL: &str = "withdraw_collateral";
     pub const ACCRUE_BATCH: &str = "accrue_batch";
     pub const FREEZE_DRAWS: &str = "freeze_draws";
@@ -71,6 +79,7 @@ pub mod entrypoint {
         SET_CREDIT_LIMIT_BOUNDS,
         SET_UTILIZATION_CAP,
         DEPOSIT_COLLATERAL,
+        PARTIAL_RELEASE_COLLATERAL,
         WITHDRAW_COLLATERAL,
         ACCRUE_BATCH,
         FREEZE_DRAWS,
@@ -179,7 +188,7 @@ pub fn write_baselines_to_manifest_dir(
             .unwrap_or_else(|e| panic!("cannot create {}: {e}", parent.display()));
     }
     let json = serde_json::to_string_pretty(baselines).expect("serialization failed");
-    std::fs::write(&path, format!("{json}\n"))
+    std::fs::write(&path, std::format!("{json}\n"))
         .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
     path
 }
@@ -193,9 +202,10 @@ pub fn check_or_log_missing(
     if let Some(baseline) = baselines.get(entrypoint) {
         assert_within_tolerance(entrypoint, sample, baseline);
     } else {
-        eprintln!(
+        std::eprintln!(
             "[budget_regression] no baseline for '{entrypoint}'; observed cpu={} mem={}",
-            sample.cpu_instructions, sample.memory_bytes
+            sample.cpu_instructions,
+            sample.memory_bytes
         );
     }
 }

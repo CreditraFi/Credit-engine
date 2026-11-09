@@ -29,7 +29,7 @@ fn setup_with_balance() -> (Env, Address, Address, Address) {
     let reserve = Address::generate(&env);
     let treasury = Address::generate(&env);
 
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -105,7 +105,7 @@ fn no_proposal_returns_none() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -129,7 +129,7 @@ fn propose_requires_treasury_configured() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     // no set_treasury — must panic with TreasuryNotSet
@@ -250,7 +250,7 @@ fn execute_without_proposal_is_rejected() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     // No proposal exists — must panic with NoPendingTreasuryWithdrawal.
@@ -264,7 +264,7 @@ fn zero_balance_proposal_executes_without_token_transfer() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let treasury = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

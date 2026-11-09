@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#![allow(dead_code)]
 
 //! Per-entrypoint authorization snapshot for the borrow (v7) surface.
 //!
@@ -61,7 +62,7 @@ fn setup(env: &Env) -> Fixture<'_> {
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -255,8 +256,8 @@ fn set_draw_min_interval_wrong_signer_reverts() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = START_TS);
     let attacker = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
     let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     // Init with mock_all_auths so setup succeeds, then strip mocks.
     env.mock_all_auths();
     let client = CreditClient::new(&env, &contract_id);
@@ -285,7 +286,7 @@ fn draw_credit_wrong_signer_reverts() {
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
     let attacker = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     env.mock_all_auths();
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
@@ -322,7 +323,7 @@ fn repay_credit_wrong_signer_reverts() {
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
     let attacker = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     env.mock_all_auths();
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
@@ -358,8 +359,8 @@ fn set_borrow_admin_cooldown_wrong_signer_reverts() {
     let env = Env::default();
     env.ledger().with_mut(|li| li.timestamp = START_TS);
     let attacker = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
     let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     env.mock_all_auths();
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
@@ -385,8 +386,8 @@ fn set_utilization_cap_wrong_signer_reverts() {
     env.ledger().with_mut(|li| li.timestamp = START_TS);
     let attacker = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
     let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     env.mock_all_auths();
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);

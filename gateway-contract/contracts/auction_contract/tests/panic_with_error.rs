@@ -9,8 +9,6 @@
 //! cargo test -p gateway-auction --test panic_with_error
 //! ```
 
-use soroban_sdk::testutils::Ledger as _;
-
 use gateway_auction::{Auction, AuctionClient, AuctionError, AuctionMode};
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{Address, Env, Symbol};
@@ -27,7 +25,7 @@ fn init_open_auction(client: &AuctionClient<'_>, auction_id: &Symbol, end_time: 
         &0_u32,
         &None,
         &None,
-        &Some(gateway_auction::DutchAuctionDecay::None),
+        &gateway_auction::DutchAuctionDecay::None,
         &None,
     );
     factory

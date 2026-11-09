@@ -22,7 +22,7 @@
 //! | ReducedRate == full rate → no waiver | ReducedRate | `reduced_rate_equal_to_full_rate_emits_no_event` |
 //! | Topic stability | FullWaiver | `event_topic_is_stable` |
 
-use creditra_credit::events::GraceWaiverReceiptEvent;
+use creditra_credit::events::GraceWaiverAppliedEvent;
 use creditra_credit::types::GraceWaiverMode;
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::testutils::{Address as _, Events, Ledger};
@@ -45,7 +45,7 @@ fn setup_suspended(
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -57,19 +57,19 @@ fn setup_suspended(
     client.open_credit_line(&borrower, &credit_limit, &rate_bps, &50_u32);
 
     // Draw at t=1 to establish accrual checkpoint.
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.draw_credit(&borrower, &draw_amount);
 
     // Suspend at the specified timestamp (clamped to ≥ 1).
     let ts = suspend_ts.max(1);
-    env.ledger().set_timestamp(ts);
+    env.ledger().with_mut(|l| l.timestamp = ts);
     client.suspend_credit_line(&borrower);
 
     (env, contract_id, borrower)
 }
 
-/// Find the `GraceWaiverReceiptEvent` in the current event log, if any.
-fn find_grace_waiver_event(env: &Env) -> Option<GraceWaiverReceiptEvent> {
+/// Find the `GraceWaiverAppliedEvent` in the current event log, if any.
+fn find_grace_waiver_event(env: &Env) -> Option<GraceWaiverAppliedEvent> {
     for event in env.events().all().iter() {
         let topics = event.1;
         if topics.len() < 2 {
@@ -79,7 +79,7 @@ fn find_grace_waiver_event(env: &Env) -> Option<GraceWaiverReceiptEvent> {
             .map(|s| s == symbol_short!("grace_wv"))
             .unwrap_or(false);
         if t1_match {
-            if let Ok(payload) = GraceWaiverReceiptEvent::try_from_val(env, &event.2) {
+            if let Ok(payload) = GraceWaiverAppliedEvent::try_from_val(env, &event.2) {
                 return Some(payload);
             }
         }
@@ -109,11 +109,11 @@ fn full_waiver_in_window_emits_event_with_correct_payload() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all(); // clear setup events
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env)
-        .expect("GraceWaiverReceiptEvent must be emitted for branch 1 FullWaiver");
+        .expect("GraceWaiverAppliedEvent must be emitted for branch 1 FullWaiver");
 
     assert_eq!(evt.borrower, borrower, "borrower address must match");
     assert_eq!(
@@ -145,11 +145,11 @@ fn reduced_rate_in_window_emits_event_waived_amount_is_difference() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::ReducedRate, &200_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env)
-        .expect("GraceWaiverReceiptEvent must be emitted for branch 1 ReducedRate");
+        .expect("GraceWaiverAppliedEvent must be emitted for branch 1 ReducedRate");
 
     assert_eq!(evt.borrower, borrower);
     assert_eq!(evt.mode, GraceWaiverMode::ReducedRate);
@@ -176,12 +176,12 @@ fn full_waiver_straddle_emits_event_for_in_grace_portion() {
 
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
-    env.ledger().set_timestamp(47_304_001); // 1 + 31_536_000 + 15_768_000
+    env.ledger().with_mut(|l| l.timestamp = 47_304_001); // 1 + 31_536_000 + 15_768_000
     let _ = env.events().all();
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env)
-        .expect("GraceWaiverReceiptEvent must be emitted in FullWaiver straddle branch");
+        .expect("GraceWaiverAppliedEvent must be emitted in FullWaiver straddle branch");
 
     assert_eq!(evt.mode, GraceWaiverMode::FullWaiver);
     assert_eq!(
@@ -201,12 +201,12 @@ fn reduced_rate_straddle_emits_event_with_correct_waived_amount() {
 
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::ReducedRate, &200_u32);
 
-    env.ledger().set_timestamp(47_304_001);
+    env.ledger().with_mut(|l| l.timestamp = 47_304_001);
     let _ = env.events().all();
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env)
-        .expect("GraceWaiverReceiptEvent must be emitted in ReducedRate straddle branch");
+        .expect("GraceWaiverAppliedEvent must be emitted in ReducedRate straddle branch");
 
     assert_eq!(evt.mode, GraceWaiverMode::ReducedRate);
     assert_eq!(
@@ -228,17 +228,17 @@ fn no_event_when_entirely_post_grace() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     // First accrual straddles grace_end — advances last_accrual_ts past grace_end.
-    env.ledger().set_timestamp(31_536_002);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_002);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     // Second accrual is entirely post-grace.
     let _ = env.events().all();
-    env.ledger().set_timestamp(63_072_002);
+    env.ledger().with_mut(|l| l.timestamp = 63_072_002);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     assert!(
         find_grace_waiver_event(&env).is_none(),
-        "No GraceWaiverReceiptEvent when accrual is entirely post-grace"
+        "No GraceWaiverAppliedEvent when accrual is entirely post-grace"
     );
 }
 
@@ -250,12 +250,12 @@ fn no_event_when_no_grace_config() {
 
     // No call to set_grace_period_config.
     let _ = env.events().all();
-    env.ledger().set_timestamp(1 + 31_536_000);
+    env.ledger().with_mut(|l| l.timestamp = 1 + 31_536_000);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     assert!(
         find_grace_waiver_event(&env).is_none(),
-        "No GraceWaiverReceiptEvent when no grace config is set"
+        "No GraceWaiverAppliedEvent when no grace config is set"
     );
 }
 
@@ -268,12 +268,12 @@ fn no_event_when_grace_seconds_is_zero() {
     client.set_grace_period_config(&0_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(1 + 31_536_000);
+    env.ledger().with_mut(|l| l.timestamp = 1 + 31_536_000);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     assert!(
         find_grace_waiver_event(&env).is_none(),
-        "No GraceWaiverReceiptEvent when grace_period_seconds == 0"
+        "No GraceWaiverAppliedEvent when grace_period_seconds == 0"
     );
 }
 
@@ -284,7 +284,7 @@ fn no_event_for_active_line() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -295,19 +295,19 @@ fn no_event_for_active_line() {
 
     client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.draw_credit(&borrower, &100_000);
 
     // Grace config set, but line is still Active (not suspended).
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(1 + 31_536_000);
+    env.ledger().with_mut(|l| l.timestamp = 1 + 31_536_000);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     assert!(
         find_grace_waiver_event(&env).is_none(),
-        "No GraceWaiverReceiptEvent for an Active (not suspended) line"
+        "No GraceWaiverAppliedEvent for an Active (not suspended) line"
     );
 }
 
@@ -318,7 +318,7 @@ fn no_event_when_utilized_amount_zero() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -329,18 +329,18 @@ fn no_event_when_utilized_amount_zero() {
 
     // Open and suspend with zero draw — utilized_amount stays at 0.
     client.open_credit_line(&borrower, &1_000_000, &1000, &50);
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.suspend_credit_line(&borrower);
 
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(1 + 31_536_000);
+    env.ledger().with_mut(|l| l.timestamp = 1 + 31_536_000);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     assert!(
         find_grace_waiver_event(&env).is_none(),
-        "No GraceWaiverReceiptEvent when utilized_amount == 0"
+        "No GraceWaiverAppliedEvent when utilized_amount == 0"
     );
 }
 
@@ -355,7 +355,7 @@ fn event_borrower_field_matches_actual_borrower() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env).expect("event must be emitted");
@@ -374,7 +374,7 @@ fn event_mode_field_matches_configured_mode() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::ReducedRate, &100_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env).expect("event must be emitted");
@@ -396,7 +396,7 @@ fn full_waiver_waived_amount_equals_full_rate_interest() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env).expect("event must be emitted");
@@ -419,7 +419,7 @@ fn reduced_rate_waived_amount_equals_difference() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::ReducedRate, &500_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let evt = find_grace_waiver_event(&env).expect("event must be emitted");
@@ -440,7 +440,7 @@ fn event_topic_is_stable() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     let all = env.events().all();
@@ -481,7 +481,7 @@ fn reduced_rate_equal_to_full_rate_emits_no_event() {
     client.set_grace_period_config(&31_536_000_u64, &GraceWaiverMode::ReducedRate, &1000_u32);
 
     let _ = env.events().all();
-    env.ledger().set_timestamp(31_536_001);
+    env.ledger().with_mut(|l| l.timestamp = 31_536_001);
     client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
     assert!(

@@ -16,7 +16,7 @@ fn setup() -> (Env, Address, Address, Address) {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     env.ledger().with_mut(|li| li.timestamp = 1_000);
     client.init(&admin);
@@ -227,7 +227,7 @@ proptest! {
         let env = Env::default();
         env.mock_all_auths_allowing_non_root_auth();
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         env.ledger().with_mut(|li| li.timestamp = 1_000);
         client.init(&admin);

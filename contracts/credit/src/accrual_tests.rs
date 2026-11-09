@@ -15,7 +15,7 @@ mod tests {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
 
@@ -47,7 +47,7 @@ mod tests {
         assert_eq!(line.last_accrual_ts, 0);
 
         // Advance time
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
 
         // First touch (draw)
         client.draw_credit(&borrower, &500);
@@ -63,7 +63,7 @@ mod tests {
         let (env, _admin, borrower, client) = setup_env();
         client.open_credit_line(&borrower, &1000, &1000, &50);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.draw_credit(&borrower, &500);
 
         // Mutate again at same timestamp
@@ -80,12 +80,12 @@ mod tests {
         // 10% annual rate = 1000 bps
         client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.draw_credit(&borrower, &100_000);
 
         // SECONDS_PER_YEAR = 31,536,000
         // Accrual after 1 year: 100,000 * 0.10 = 10,000
-        env.ledger().set_timestamp(100 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 100 + 31_557_600);
 
         // Trigger accrual via a no-op update
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
@@ -101,18 +101,18 @@ mod tests {
         let (env, _admin, borrower, client) = setup_env();
         client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.draw_credit(&borrower, &100_000);
 
         // Accrue for 6 months (approx)
-        env.ledger().set_timestamp(100 + 15_778_800);
+        env.ledger().with_mut(|l| l.timestamp = 100 + 15_778_800);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line1 = client.get_credit_line(&borrower).unwrap();
         assert_eq!(line1.accrued_interest, 5000);
 
         // Accrue for another 6 months
-        env.ledger().set_timestamp(100 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 100 + 31_557_600);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line2 = client.get_credit_line(&borrower).unwrap();
@@ -131,11 +131,11 @@ mod tests {
         let (env, _admin, borrower, client) = setup_env();
         client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.draw_credit(&borrower, &100_000);
 
         // Accrue 10,000
-        env.ledger().set_timestamp(100 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 100 + 31_557_600);
 
         // Repay 5,000. This should trigger accrual first, then subtract from 110,000.
         // Accrued interest becomes 10,000.
@@ -159,10 +159,10 @@ mod tests {
         let (env, _admin, borrower, client) = setup_env();
         client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50); // establishes checkpoint
 
-        env.ledger().set_timestamp(100 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 100 + 31_557_600);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -175,13 +175,13 @@ mod tests {
         let (env, _admin, borrower, client) = setup_env();
         client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.draw_credit(&borrower, &100_000);
 
         // Accrue for 1 second.
         // 100,000 * 1000 * 1 / (10,000 * 31,536,000) = 100,000,000 / 315,360,000,000 = 0.0003...
         // Should floor to 0.
-        env.ledger().set_timestamp(101);
+        env.ledger().with_mut(|l| l.timestamp = 101);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -195,11 +195,12 @@ mod tests {
         // Use very large utilized amount and rate
         client.open_credit_line(&borrower, &i128::MAX, &10000, &100);
 
-        env.ledger().set_timestamp(100);
+        env.ledger().with_mut(|l| l.timestamp = 100);
         client.draw_credit(&borrower, &1_000_000_000_000_000_000_i128); // 1e18
 
         // Advance time by 100 years
-        env.ledger().set_timestamp(100 + 100 * 31_557_600);
+        env.ledger()
+            .with_mut(|l| l.timestamp = 100 + 100 * 31_557_600);
 
         // This should not panic if using i128 correctly
         client.update_risk_parameters(&borrower, &i128::MAX, &10000, &100);
@@ -235,7 +236,7 @@ mod grace_period_tests {
         env.mock_all_auths();
         let admin = Address::generate(env);
         let borrower = Address::generate(env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(env, &contract_id);
         client.init(&admin);
 
@@ -247,12 +248,12 @@ mod grace_period_tests {
         client.open_credit_line(&borrower, &credit_limit, &rate_bps, &50_u32);
 
         // Draw at t=1 (non-zero) to establish a valid accrual checkpoint.
-        env.ledger().set_timestamp(1);
+        env.ledger().with_mut(|l| l.timestamp = 1);
         client.draw_credit(&borrower, &draw_amount);
 
         // Suspend at the given timestamp (must be >= 1).
         let actual_suspend_ts = if suspend_ts < 1 { 1 } else { suspend_ts };
-        env.ledger().set_timestamp(actual_suspend_ts);
+        env.ledger().with_mut(|l| l.timestamp = actual_suspend_ts);
         client.suspend_credit_line(&borrower);
 
         (client, contract_id, borrower)
@@ -269,7 +270,7 @@ mod grace_period_tests {
         // Elapsed = 31_557_600 s → interest = 10_000
         let (client, _contract_id, borrower) = setup_suspended(&env, 1_000_000, 100_000, 1000, 1);
 
-        env.ledger().set_timestamp(1 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 1 + 31_557_600);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -289,7 +290,7 @@ mod grace_period_tests {
         client.set_grace_period_config(&31_557_600_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
         // Trigger accrual at t = 1 + half a year (inside grace window).
-        env.ledger().set_timestamp(1 + 15_778_800);
+        env.ledger().with_mut(|l| l.timestamp = 1 + 15_778_800);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -309,7 +310,7 @@ mod grace_period_tests {
         // Trigger accrual exactly at the grace boundary (t = suspension_ts + grace_period_seconds).
         // suspension_ts = 1, grace_end = 1 + 31_557_600 = 31_557_601
         // now = 31_557_601 → now <= grace_end → still inside (Case 1).
-        env.ledger().set_timestamp(31_557_601);
+        env.ledger().with_mut(|l| l.timestamp = 31_557_601);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -329,7 +330,7 @@ mod grace_period_tests {
         // Trigger accrual at t = 31_557_601 + 31_557_600 (1 year after grace end).
         // In-grace: 1 to 31_557_601 → 0 interest (FullWaiver).
         // Post-grace: 31_557_601 to 63_115_201 (31_557_600 s) → 10_000 interest.
-        env.ledger().set_timestamp(63_115_201);
+        env.ledger().with_mut(|l| l.timestamp = 63_115_201);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -352,7 +353,7 @@ mod grace_period_tests {
         // Trigger accrual at t = 31_557_601 (exactly at grace_end → still inside, Case 1).
         // Elapsed = 31_557_601 - 1 = 31_557_600 s at 200 bps.
         // Interest = 100_000 * 200 * 31_557_600 / (10_000 * 31_557_600) = 2_000
-        env.ledger().set_timestamp(31_557_601);
+        env.ledger().with_mut(|l| l.timestamp = 31_557_601);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -376,7 +377,7 @@ mod grace_period_tests {
         // last_accrual_ts = 1 (set during suspend_credit_line).
         // In-grace: 1 to 31_557_601 (31_557_600 s) → 0 interest (FullWaiver).
         // Post-grace: 31_557_601 to 47_336_401 (15_778_800 s) → 5_000 interest.
-        env.ledger().set_timestamp(47_336_401);
+        env.ledger().with_mut(|l| l.timestamp = 47_336_401);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -397,7 +398,7 @@ mod grace_period_tests {
         // In-grace (1 to 31_557_601 = 31_557_600 s at 200 bps): 2_000
         // Post-grace (31_557_601 to 47_336_401 = 15_778_800 s at 1000 bps): 5_000
         // Total = 7_000
-        env.ledger().set_timestamp(47_336_401);
+        env.ledger().with_mut(|l| l.timestamp = 47_336_401);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -416,7 +417,7 @@ mod grace_period_tests {
         // Set config but with 0 seconds — effectively disabled.
         client.set_grace_period_config(&0_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
-        env.ledger().set_timestamp(1 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 1 + 31_557_600);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -433,7 +434,7 @@ mod grace_period_tests {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
         let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
@@ -443,14 +444,14 @@ mod grace_period_tests {
         client.open_credit_line(&borrower, &1_000_000, &1000, &50);
 
         // Draw at t=1 to establish a valid accrual checkpoint.
-        env.ledger().set_timestamp(1);
+        env.ledger().with_mut(|l| l.timestamp = 1);
         client.draw_credit(&borrower, &100_000);
 
         // Set a full-waiver grace period.
         client.set_grace_period_config(&31_557_600_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
         // Advance 1 year — line is still Active, not Suspended.
-        env.ledger().set_timestamp(1 + 31_557_600);
+        env.ledger().with_mut(|l| l.timestamp = 1 + 31_557_600);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -480,7 +481,7 @@ mod grace_period_tests {
         let env = Env::default();
         env.mock_all_auths();
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
 
@@ -501,7 +502,7 @@ mod grace_period_tests {
         let env = Env::default();
         // No mock_all_auths — admin check fires.
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         env.mock_all_auths();
         client.init(&admin);
@@ -518,7 +519,7 @@ mod grace_period_tests {
         let env = Env::default();
         env.mock_all_auths();
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
         client.set_grace_period_config(&1000_u64, &GraceWaiverMode::ReducedRate, &10_001_u32);
@@ -537,14 +538,15 @@ mod grace_period_tests {
         client.set_grace_period_config(&31_557_600_u64, &GraceWaiverMode::FullWaiver, &0_u32);
 
         // Default at t = 0.5 years (inside grace window).
-        env.ledger().set_timestamp(15_778_800);
+        env.ledger().with_mut(|l| l.timestamp = 15_778_800);
         client.default_credit_line(&borrower);
 
         // Reinstate at t = 0.5 years (same timestamp, no additional accrual).
         client.reinstate_credit_line(&borrower, &CreditStatus::Active);
 
         // Advance 1 more year — line is now Active, grace does not apply.
-        env.ledger().set_timestamp(15_778_800 + 31_557_600);
+        env.ledger()
+            .with_mut(|l| l.timestamp = 15_778_800 + 31_557_600);
         client.update_risk_parameters(&borrower, &1_000_000, &1000, &50);
 
         let line = client.get_credit_line(&borrower).unwrap();
@@ -560,7 +562,7 @@ mod grace_period_tests {
         let (client, _contract_id, borrower) = setup_suspended(&env, 1_000_000, 100_000, 1000, 100);
 
         // Default then reinstate.
-        env.ledger().set_timestamp(200);
+        env.ledger().with_mut(|l| l.timestamp = 200);
         client.default_credit_line(&borrower);
         client.reinstate_credit_line(&borrower, &CreditStatus::Active);
 

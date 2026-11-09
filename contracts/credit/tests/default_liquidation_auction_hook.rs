@@ -1,8 +1,8 @@
-use creditra_credit::types::{ContractError, CreditStatus};
+use creditra_credit::types::CreditStatus;
 use creditra_credit::{Credit, CreditClient};
 use gateway_auction::{Auction, AuctionClient, AuctionMode};
 use soroban_sdk::testutils::{Address as _, Events as _, Ledger};
-use soroban_sdk::{token, Address, Env, Symbol, TryFromVal, TryIntoVal};
+use soroban_sdk::{token, Address, Env, Symbol, TryFromVal};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn setup_auction(
@@ -33,7 +33,7 @@ fn setup_auction(
     let bidder = Address::generate(env);
     auction.place_bid(settlement_id, &bidder, &recovered_amount);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
     auction.close_auction(settlement_id);
 }
 
@@ -43,7 +43,7 @@ fn setup_defaulted_line(utilized_amount: i128) -> (Env, Address, Address) {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
 
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
@@ -139,7 +139,7 @@ fn settle_default_liquidation_requires_defaulted_status() {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);
@@ -180,7 +180,7 @@ fn set_and_get_auction_contract_address() {
     env.mock_all_auths_allowing_non_root_auth();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -245,10 +245,22 @@ fn settle_clears_reentrancy_guard_on_success() {
     let client = CreditClient::new(&env, &contract_id);
 
     // First settlement — should set and clear reentrancy guard
-    client.settle_default_liquidation(&borrower, &200_i128, &Symbol::new(&env, "auc_re1"), &10_000_u32, &None);
+    client.settle_default_liquidation(
+        &borrower,
+        &200_i128,
+        &Symbol::new(&env, "auc_re1"),
+        &10_000_u32,
+        &None,
+    );
 
     // Second settlement with different id — proves guard was cleared
-    client.settle_default_liquidation(&borrower, &100_i128, &Symbol::new(&env, "auc_re2"), &10_000_u32, &None);
+    client.settle_default_liquidation(
+        &borrower,
+        &100_i128,
+        &Symbol::new(&env, "auc_re2"),
+        &10_000_u32,
+        &None,
+    );
 
     let line = client.get_credit_line(&borrower).unwrap();
     assert_eq!(line.utilized_amount, 200); // 500 - 200 - 100

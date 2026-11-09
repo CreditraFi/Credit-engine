@@ -219,6 +219,9 @@ export ADMIN_ADDRESS="$(stellar keys public-key operator)"
 export TOKEN_ADDRESS="<testnet SAC or compatible token contract address>"
 
 # 1. One-time initialization. Re-running reverts with AlreadyInitialized (14).
+#    init requires the deployer's signature, so it must be signed by the same
+#    account that deployed the contract ("operator" below). Without this
+#    binding an attacker could initialize first and take the admin role.
 stellar contract invoke \
   --id credit --source operator --network testnet \
   -- init --admin "$ADMIN_ADDRESS"
@@ -318,6 +321,7 @@ Deployment is a manual operator action against testnet only.
 | `Generated TypeScript bindings are stale` | Run `scripts/generate-bindings.sh`, review the diff, and commit it with the interface change. |
 | `npm` cannot resolve `@stellar/stellar-sdk` | Run `npm ci` from the repository root (the bindings are npm workspaces). |
 | `AlreadyInitialized` (error 14) on deploy | `init` is one-time; deploy a fresh contract ID instead of re-initializing. |
+| `init` rejected with an auth error | Sign `init` with the account that deployed the contract; initialization is bound to the deployer. |
 | `NoFactoryContract` on auction calls | Call `set_factory_contract` from the credit contract before closing or settling. |
 
 ---

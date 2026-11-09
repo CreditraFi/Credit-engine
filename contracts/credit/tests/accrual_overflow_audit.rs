@@ -24,7 +24,7 @@ fn setup_with_token(reserve_amount: i128) -> (Env, Address, Address, Address) {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -60,12 +60,13 @@ fn max_rate_large_principal_long_elapsed_does_not_panic() {
     client.open_credit_line(&borrower, &principal, &10_000_u32, &50_u32);
 
     // Draw at t = 1 to establish the accrual checkpoint.
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.draw_credit(&borrower, &principal);
 
     // Advance 1 000 years.
     let one_thousand_years: u64 = 1_000 * 31_536_000;
-    env.ledger().set_timestamp(1 + one_thousand_years);
+    env.ledger()
+        .with_mut(|l| l.timestamp = 1 + one_thousand_years);
 
     // Trigger accrual — must not panic.
     client.update_risk_parameters(&borrower, &i128::MAX, &10_000_u32, &50_u32);
@@ -103,11 +104,11 @@ fn overflow_path_returns_contract_error_overflow_deterministically() {
     client.open_credit_line(&borrower, &huge_principal, &10_000_u32, &50_u32);
 
     // Draw at t = 1.
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.draw_credit(&borrower, &huge_principal);
 
     // Advance time so accrual is triggered.
-    env.ledger().set_timestamp(2);
+    env.ledger().with_mut(|l| l.timestamp = 2);
 
     // Trigger accrual — must revert with ContractError::Overflow (code 12).
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -152,9 +153,9 @@ fn overflow_path_is_deterministic_same_inputs_same_error() {
 
         client.open_credit_line(&borrower, &huge_principal, &10_000_u32, &50_u32);
 
-        env.ledger().set_timestamp(1);
+        env.ledger().with_mut(|l| l.timestamp = 1);
         client.draw_credit(&borrower, &huge_principal);
-        env.ledger().set_timestamp(2);
+        env.ledger().with_mut(|l| l.timestamp = 2);
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             client.update_risk_parameters(&borrower, &i128::MAX, &10_000_u32, &50_u32);

@@ -7,7 +7,7 @@ fn setup() -> (Env, Address) {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     (env, contract_id)

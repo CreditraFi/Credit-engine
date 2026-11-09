@@ -54,11 +54,11 @@ impl Ctx {
 fn setup_env() -> Ctx {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
-    env.ledger().set_timestamp(INITIAL_TIMESTAMP);
+    env.ledger().with_mut(|l| l.timestamp = INITIAL_TIMESTAMP);
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
     let token_address = token_id.address();
     let client = CreditClient::new(&env, &contract_id);
@@ -217,7 +217,7 @@ proptest! {
         repayments in proptest::collection::vec(1_i128..=5_000_i128, 1..8),
     ) {
         let ctx = setup_env();
-        ctx.env.ledger().set_timestamp(INITIAL_TIMESTAMP + elapsed_seconds);
+        ctx.env.ledger().with_mut(|l| l.timestamp = INITIAL_TIMESTAMP + elapsed_seconds);
 
         ctx.client().set_repayment_schedule(
             &ctx.borrower,
@@ -252,11 +252,7 @@ proptest! {
             outstanding -= effective_repay;
 
             let schedule = ctx.client().get_repayment_schedule(&ctx.borrower).unwrap();
-            prop_assert_eq!(
-                schedule.next_due_ts,
-                expected_due,
-                "amount_per_period={amount_per_period}, period_seconds={period_seconds}, elapsed_seconds={elapsed_seconds}, requested_repay={requested_repay}, effective_repay={effective_repay}, interest_repaid={interest_repaid}, principal_repaid={principal_repaid}, outstanding={outstanding}",
-            );
+            prop_assert_eq!(schedule.next_due_ts, expected_due);
         }
     }
 }

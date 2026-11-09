@@ -30,7 +30,7 @@ fn setup_minimal() -> (Env, CreditClient<'static>, Address, Address, Address) {
     let borrower = Address::generate(&env);
     let reserve = Address::generate(&env);
 
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -60,10 +60,6 @@ fn prepare_repay(
     asset.mint(&client.contract_id, &draw_amount);
     client.draw_credit(borrower, &draw_amount);
 
-    // Widen bounds if fee_bps exceeds the default 1000 cap.
-    if fee_bps > 1000 {
-        client.set_protocol_fee_bounds(&0_u32, &fee_bps);
-    }
     client.set_protocol_fee_bps(&fee_bps);
 
     asset.mint(borrower, &repay_amount);

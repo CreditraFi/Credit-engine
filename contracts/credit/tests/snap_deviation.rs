@@ -10,6 +10,7 @@ use creditra_credit::math_utils::compute_deviation_bps;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct DeviationTestCase {
     new_price: i128,
     last_price: i128,
@@ -76,7 +77,7 @@ proptest! {
         new_price in 1i128..=100_000_000i128,
         last_price in 1i128..=100_000_000i128,
     ) {
-        let expected = ((new_price - last_price).unsigned_abs() as u128 * 10_000u128
+        let expected = ((new_price - last_price).unsigned_abs() * 10_000u128
             / last_price as u128)
         .min(u32::MAX as u128) as u32;
 

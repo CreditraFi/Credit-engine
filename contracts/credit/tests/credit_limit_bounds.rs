@@ -7,10 +7,7 @@
 
 #![cfg(test)]
 
-use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    Address, Env,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use creditra_credit::types::ContractError;
 use creditra_credit::{Credit, CreditClient};
@@ -22,7 +19,7 @@ fn setup_env() -> (Env, CreditClient<'static>, Address, Address) {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register_contract(None, Credit);
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);
@@ -42,7 +39,7 @@ fn setup_with_bounds(min: i128, max: i128) -> (Env, CreditClient<'static>, Addre
 fn test_set_bounds_requires_admin_auth() {
     let (env, client, _contract_id, _admin) = setup_env();
 
-    let non_admin = Address::generate(&env);
+    let _non_admin = Address::generate(&env);
 
     // Clear mock_all_auths to test actual authorization
     env.mock_auths(&[]);

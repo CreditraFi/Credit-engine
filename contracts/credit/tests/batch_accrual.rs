@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use soroban_sdk::testutils::Ledger;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use creditra_credit::events::InterestAccruedEvent;
@@ -14,7 +15,7 @@ fn setup_env() -> (Env, Address, CreditClient<'static>) {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -66,13 +67,13 @@ fn accrue_batch_skips_missing_and_non_active_lines() {
     client.open_credit_line(&active, &1_000_000_i128, &1_000_u32, &50_u32);
     client.open_credit_line(&suspended, &1_000_000_i128, &1_000_u32, &50_u32);
 
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.draw_credit(&active, &100_000_i128);
     client.draw_credit(&suspended, &100_000_i128);
 
     client.suspend_credit_line(&suspended);
 
-    env.ledger().set_timestamp(1 + 31_536_000);
+    env.ledger().with_mut(|l| l.timestamp = 1 + 31_536_000);
 
     let before_events = env.events().all().len();
 

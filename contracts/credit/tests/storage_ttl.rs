@@ -6,20 +6,17 @@
 //! These entries must have their TTL extended on frequently-invoked read/write
 //! paths so that active credit lines are not silently archived by the network.
 
-use creditra_credit::storage::{
-    DataKey, CREDIT_LINE_TTL_EXTEND_TO, CREDIT_LINE_TTL_THRESHOLD, LEDGER_BUMP_AMOUNT,
-    LEDGER_BUMP_THRESHOLD,
-};
+use creditra_credit::storage::{DataKey, DrawAuditKey, LEDGER_BUMP_AMOUNT, LEDGER_BUMP_THRESHOLD};
 use creditra_credit::types::{CreditLineData, CreditStatus, GracePeriodConfig, GraceWaiverMode};
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::testutils::storage::{Instance as _, Persistent as _};
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{Address, Env, Symbol};
 
-fn setup(env: &Env) -> (Address, CreditClient, Address) {
+fn setup(env: &Env) -> (Address, CreditClient<'_>, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     (contract_id, client, admin)
@@ -42,9 +39,9 @@ fn ttl_for_key<K: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(
 fn instance_ttl_for_key<K: soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(
     env: &Env,
     contract_id: &Address,
-    key: &K,
+    _key: &K,
 ) -> u32 {
-    env.as_contract(contract_id, || env.storage().instance().get_ttl(key))
+    env.as_contract(contract_id, || env.storage().instance().get_ttl())
 }
 
 #[test]
@@ -225,7 +222,7 @@ fn accrual_path_bumps_instance_ttl_for_accrual_reads() {
         env.storage().persistent().set(&borrower, &line);
     });
 
-    env.ledger().set_timestamp(100);
+    env.ledger().with_mut(|l| l.timestamp = 100);
     client.update_risk_parameters(&borrower, &1_000_i128, &300_u32, &70_u32);
 
     let ttl_after = instance_ttl_for_key(&env, &contract_id, &grace_key);
@@ -345,9 +342,13 @@ fn reverse_draw_bumps_credit_line_ttl_on_accrual_read() {
     // find an original draw to reverse.
     let original_ts = env.ledger().timestamp();
     env.as_contract(&contract_id, || {
-        env.storage()
-            .persistent()
-            .set(&DataKey::DrawAudit(borrower.clone(), original_ts), &200_i128);
+        env.storage().persistent().set(
+            &DataKey::DrawAudit(DrawAuditKey {
+                borrower: borrower.clone(),
+                timestamp: original_ts,
+            }),
+            &200_i128,
+        );
     });
 
     drain_credit_line_ttl(&env, &contract_id, &borrower);

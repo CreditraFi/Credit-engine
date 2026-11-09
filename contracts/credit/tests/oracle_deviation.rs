@@ -13,17 +13,17 @@
 //! - Missing oracle_price when config is set rejected with `OraclePriceInvalid`
 //! - `get_oracle_config` returns stored config
 
-use creditra_credit::types::{ContractError, CreditStatus, OracleConfig};
+use creditra_credit::types::CreditStatus;
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token, Address, Env, Symbol};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-fn setup(env: &Env) -> (CreditClient, Address, Address) {
+fn setup(env: &Env) -> (CreditClient<'_>, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     (client, contract_id, admin)

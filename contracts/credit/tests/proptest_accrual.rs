@@ -32,7 +32,6 @@
 //! | Time advancement  | Drives interest accumulation between mutations   |
 //! | Multiple borrowers | Ensures invariant holds across all lines        |
 
-use creditra_credit::types::CreditStatus;
 use creditra_credit::{Credit, CreditClient};
 use proptest::prelude::*;
 use proptest::test_runner::Config as ProptestConfig;
@@ -48,10 +47,10 @@ const LIQUIDITY_AMOUNT: i128 = 10_000_000;
 fn setup_env() -> (Env, CreditClient<'static>, std::vec::Vec<Address>) {
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().set_timestamp(INITIAL_TIMESTAMP);
+    env.ledger().with_mut(|l| l.timestamp = INITIAL_TIMESTAMP);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -79,14 +78,14 @@ fn setup_env() -> (Env, CreditClient<'static>, std::vec::Vec<Address>) {
 
 /// Assert `0 <= accrued_interest <= utilized_amount` for every active line.
 fn assert_accrued_le_utilized(client: &CreditClient<'_>, label: &str) {
-    let mut cursor = None;
+    let mut cursor: Option<u32> = None;
     loop {
         let page = client.enumerate_credit_lines(&cursor, &8);
         if page.is_empty() {
             break;
         }
         for item in page.iter() {
-            let (_, line) = item;
+            let (id, line) = item;
             assert!(
                 line.accrued_interest >= 0,
                 "{label}: accrued_interest is negative ({}) for borrower {:?}",
@@ -100,6 +99,7 @@ fn assert_accrued_le_utilized(client: &CreditClient<'_>, label: &str) {
                 line.utilized_amount,
                 line.borrower,
             );
+            cursor = Some(id);
         }
     }
 }

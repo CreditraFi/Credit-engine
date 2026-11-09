@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 #![cfg_attr(not(test), no_std)]
 
 pub mod curves;
@@ -223,6 +224,7 @@ impl Auction {
     ///
     /// # Panics
     /// Panics if `start_time >= end_time`, if `min_increment_bps > 10_000`, or if Dutch auction parameters are invalid.
+    #[allow(clippy::too_many_arguments)]
     pub fn init_auction(
         env: Env,
         auction_id: Symbol,
@@ -453,6 +455,23 @@ impl Auction {
     /// * [`AuctionError::NotFound`] — no auction found for `auction_id`.
     /// * [`AuctionError::AuctionNotOpen`] — auction is already `Closed`.
     /// * [`AuctionError::AlreadyClaimed`] — auction is in `Claimed` terminal state.
+    /// Set the liquidation auction grace window in seconds.
+    ///
+    /// During the window, `place_bid` fails with
+    /// [`AuctionError::GracePeriodActive`]. Pass `0` to disable it. Requires
+    /// authorization from the configured factory contract.
+    pub fn set_liquidation_grace_window(env: Env, seconds: u64) {
+        let factory = get_factory_contract(&env)
+            .unwrap_or_else(|| env.panic_with_error(AuctionError::NoFactoryContract));
+        factory.require_auth();
+        storage::set_liquidation_grace_window(&env, seconds);
+    }
+
+    /// Return the configured liquidation auction grace window in seconds.
+    pub fn get_liquidation_grace_window(env: Env) -> u64 {
+        storage::get_liquidation_grace_window(&env)
+    }
+
     pub fn close_auction(env: Env, auction_id: Symbol) {
         let factory = get_factory_contract(&env)
             .unwrap_or_else(|| env.panic_with_error(AuctionError::NoFactoryContract));
@@ -499,6 +518,7 @@ impl Auction {
     /// * [`AuctionError::NotFound`] - Auction not found.
     /// * [`AuctionError::NotClosed`] - Auction is not in the `Closed` state.
     /// * [`AuctionError::AlreadySettled`] - Auction has already been settled.
+    #[allow(clippy::too_many_arguments)]
     pub fn settle_default_liquidation(
         env: Env,
         auction_id: Symbol,

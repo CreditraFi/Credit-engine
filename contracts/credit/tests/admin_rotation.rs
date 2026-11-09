@@ -10,7 +10,7 @@ fn setup() -> (Env, Address, Address) {
     env.mock_all_auths_allowing_non_root_auth();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -54,7 +54,7 @@ fn accept_requires_proposed_admin_auth() {
     let env = Env::default();
     let proposed = Address::generate(&env);
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
 
     env.as_contract(&contract_id, || {
         env.storage()

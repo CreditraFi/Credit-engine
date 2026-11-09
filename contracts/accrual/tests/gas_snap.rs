@@ -25,13 +25,13 @@
 
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::{
-    testutils::{budget::Budget, Address as _, Ledger},
+    testutils::{Address as _, Ledger},
     token, Address, Env, Vec,
 };
 
 /// Reset the budget, run `f`, and return consumed CPU + memory.
 fn measure(env: &Env, f: impl FnOnce()) -> (u64, u64) {
-    let budget = env.cost_estimate().budget();
+    let mut budget = env.cost_estimate().budget();
     budget.reset_unlimited();
     f();
     (budget.cpu_instruction_cost(), budget.memory_bytes_cost())
@@ -43,9 +43,10 @@ fn setup(token_mint: i128) -> (Env, Address, Address) {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
+    client.set_min_collateral_ratio_bps(&0);
 
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
     let token_address = token_id.address();
@@ -181,25 +182,28 @@ fn gas_accrue_batch_five_with_interest() {
 /// same resources (deterministic cost model).
 #[test]
 fn gas_accrue_batch_deterministic() {
-    let (env, contract_id, _admin) = setup(500_000_i128);
-    let client = CreditClient::new(&env, &contract_id);
+    let run = || {
+        let (env, contract_id, _admin) = setup(500_000_i128);
+        let client = CreditClient::new(&env, &contract_id);
 
-    let mut borrowers: Vec<Address> = Vec::new(&env);
-    for _ in 0..3 {
-        let b = Address::generate(&env);
-        client.open_credit_line(&b, &50_000_i128, &500_u32, &50_u32);
-        client.draw_credit(&b, &5_000_i128);
-        borrowers.push_back(b);
-    }
+        let mut borrowers: Vec<Address> = Vec::new(&env);
+        for _ in 0..3 {
+            let b = Address::generate(&env);
+            client.open_credit_line(&b, &50_000_i128, &500_u32, &50_u32);
+            client.draw_credit(&b, &5_000_i128);
+            borrowers.push_back(b);
+        }
 
-    env.ledger().with_mut(|l| l.timestamp += 86_400 * 15);
+        env.ledger().with_mut(|l| l.timestamp += 86_400 * 15);
+        measure(&env, || {
+            client.accrue_batch(&borrowers);
+        })
+    };
 
-    let (cpu1, mem1) = measure(&env, || {
-        client.accrue_batch(&borrowers);
-    });
-    let (cpu2, mem2) = measure(&env, || {
-        client.accrue_batch(&borrowers);
-    });
+    // Measure two independent runs from the same starting state. Calling twice
+    // in the same environment would compare an accrual call with a no-op call.
+    let (cpu1, mem1) = run();
+    let (cpu2, mem2) = run();
 
     assert_eq!(cpu1, cpu2, "accrue_batch CPU must be deterministic");
     assert_eq!(mem1, mem2, "accrue_batch memory must be deterministic");

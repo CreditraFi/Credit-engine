@@ -28,7 +28,7 @@ fn setup() -> (Env, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     (env, admin, contract_id)
@@ -256,7 +256,7 @@ fn freeze_action_succeeds_after_cooldown_expires() {
 
     // Advance time past the cooldown
     let now = env.ledger().timestamp();
-    env.ledger().set_timestamp(now + 61);
+    env.ledger().with_mut(|l| l.timestamp = now + 61);
 
     // Second freeze should succeed
     client.freeze_draws(&FreezeReason::Compliance);
@@ -275,7 +275,7 @@ fn freeze_action_succeeds_at_exact_cooldown_boundary() {
 
     // Advance time exactly to the cooldown boundary
     let now = env.ledger().timestamp();
-    env.ledger().set_timestamp(now + 60);
+    env.ledger().with_mut(|l| l.timestamp = now + 60);
 
     // Should succeed at exact boundary (now >= last_ts + cooldown)
     client.freeze_draws(&FreezeReason::Compliance);
@@ -353,7 +353,7 @@ fn get_freeze_cooldown_returns_configured_value() {
 fn set_freeze_cooldown_requires_admin_auth() {
     let env = Env::default();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.set_freeze_cooldown(&3600);

@@ -93,18 +93,18 @@ impl Collateral {
         user.require_auth();
 
         if amount <= 0 {
-            return Err(CollateralError::InvalidAmount); 
+            return Err(CollateralError::InvalidAmount);
         }
 
         let key = DataKey::Balance(user.clone());
         let current_balance: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        
+
         let new_balance = current_balance
             .checked_add(amount)
-            .ok_or(CollateralError::MathOverflow)?;
+            .ok_or(CollateralError::Overflow)?;
 
         env.storage().persistent().set(&key, &new_balance);
-        
+
         Ok(())
     }
 
@@ -126,10 +126,10 @@ impl Collateral {
 
         let key = DataKey::Balance(user.clone());
         let current_balance: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        
+
         let new_balance = current_balance
             .checked_sub(amount)
-            .ok_or(CollateralError::InsufficientBalance)?;
+            .ok_or(CollateralError::InsufficientCollateralBalance)?;
 
         env.storage().persistent().set(&key, &new_balance);
 

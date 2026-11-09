@@ -44,7 +44,7 @@ fn setup(env: &Env) -> Fixture<'_> {
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 

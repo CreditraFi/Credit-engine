@@ -43,17 +43,17 @@ use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /// Build a minimal environment with the Credit contract initialised.
-fn setup(env: &Env) -> (CreditClient, Address) {
+fn setup(env: &Env) -> (CreditClient<'_>, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     (client, admin)
 }
 
 /// Configure a quorum policy and return the client ready for price submission.
-fn setup_with_quorum(env: &Env, k: u32, max_dev_bps: u32, max_age: u64) -> CreditClient {
+fn setup_with_quorum(env: &Env, k: u32, max_dev_bps: u32, max_age: u64) -> CreditClient<'_> {
     let (client, _) = setup(env);
     client.set_oracle_quorum_config(&k, &max_dev_bps, &max_age);
     client
@@ -256,8 +256,8 @@ fn quorum_max_feeds_accepted() {
     let prices = price_vec(
         &env,
         &[
-            1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000,
-            1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000,
+            1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000,
+            1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000, 1_000,
         ],
     );
     client.submit_oracle_prices(&prices);
@@ -275,9 +275,8 @@ fn quorum_exceeds_max_feeds_reverts() {
     let prices = price_vec(
         &env,
         &[
-            100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
-            100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
-            100,
+            100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+            100, 100, 100, 100,
         ],
     );
     client.submit_oracle_prices(&prices);

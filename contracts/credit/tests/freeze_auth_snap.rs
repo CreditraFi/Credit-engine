@@ -45,7 +45,7 @@ fn setup(env: &Env) -> (CreditClient<'_>, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
@@ -58,7 +58,7 @@ fn setup(env: &Env) -> (CreditClient<'_>, Address, Address) {
 fn setup_no_mock(env: &Env) -> (CreditClient<'_>, Address, Address, Address) {
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
@@ -74,7 +74,7 @@ fn freeze_draws_auth_snapshot() {
     let env = Env::default();
     let (client, admin, _borrower) = setup(&env);
 
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     let auths = env.auths();
     assert_eq!(
@@ -92,7 +92,7 @@ fn freeze_draws_auth_snapshot() {
 fn unfreeze_draws_auth_snapshot() {
     let env = Env::default();
     let (client, admin, _borrower) = setup(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     client.unfreeze_draws();
 
@@ -156,7 +156,7 @@ fn unfreeze_credit_line_auth_snapshot() {
 fn freeze_draws_reverts_without_auth() {
     let env = Env::default();
     let (client, _contract_id, _admin, _borrower) = setup_no_mock(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn unfreeze_draws_reverts_without_auth() {
                 sub_invokes: &[],
             },
         }])
-        .freeze_draws();
+        .freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     // No signer mocked for this call — must revert.
     client.unfreeze_draws();
@@ -232,7 +232,7 @@ fn freeze_draws_wrong_signer_reverts() {
                 sub_invokes: &[],
             },
         }])
-        .freeze_draws();
+        .freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 }
 
 #[test]
@@ -263,7 +263,7 @@ fn freeze_credit_line_wrong_signer_reverts() {
 fn is_draws_frozen_requires_no_auth() {
     let env = Env::default();
     let (client, _admin, _borrower) = setup(&env);
-    client.freeze_draws();
+    client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
     let _ = client.is_draws_frozen();
 

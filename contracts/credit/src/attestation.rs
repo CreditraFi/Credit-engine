@@ -357,7 +357,9 @@ mod tests {
 
         client.commit_attestation_batch(&borrower, &root, &3);
 
-        let batch = client.get_attestation_batch(&borrower).expect("batch should exist");
+        let batch = client
+            .get_attestation_batch(&borrower)
+            .expect("batch should exist");
         assert_eq!(batch.merkle_root, root);
         assert_eq!(batch.count, 3);
     }
@@ -373,7 +375,9 @@ mod tests {
         client.commit_attestation_batch(&borrower, &root1, &1);
         client.commit_attestation_batch(&borrower, &root2, &2);
 
-        let batch = client.get_attestation_batch(&borrower).expect("batch should exist");
+        let batch = client
+            .get_attestation_batch(&borrower)
+            .expect("batch should exist");
         assert_eq!(batch.merkle_root, root2);
         assert_eq!(batch.count, 2);
     }
@@ -445,7 +449,7 @@ mod tests {
     #[should_panic(expected = "Error(Contract, #53)")]
     fn verify_no_batch_panics() {
         let env = Env::default();
-        let (client, _admin, borrower) = setup(&env);
+        let (_client, _admin, borrower) = setup(&env);
         let l = leaf(&env, 0xDD);
         // No batch committed — must panic with InvalidAttestation.
         verify_attestation_proof(env.clone(), borrower, l, vec![&env]);

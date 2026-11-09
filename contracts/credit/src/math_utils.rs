@@ -128,7 +128,7 @@ pub fn mul_div(a: u128, numerator: u128, denominator: u128, rounding: Rounding) 
     match rounding {
         Rounding::Floor => quotient,
         Rounding::Ceil => {
-            if product % denominator != 0 {
+            if !product.is_multiple_of(denominator) {
                 quotient.checked_add(1).expect("math_utils: ceil overflow")
             } else {
                 quotient
@@ -156,7 +156,7 @@ pub fn safe_mul_div(
     match rounding {
         Rounding::Floor => Some(quotient),
         Rounding::Ceil => {
-            if product % denominator != 0 {
+            if !product.is_multiple_of(denominator) {
                 quotient.checked_add(1)
             } else {
                 Some(quotient)
@@ -188,7 +188,7 @@ pub fn scale_down(amount: u128, rounding: Rounding) -> u128 {
     match rounding {
         Rounding::Floor => quotient,
         Rounding::Ceil => {
-            if amount % SCALE != 0 {
+            if !amount.is_multiple_of(SCALE) {
                 quotient
                     .checked_add(1)
                     .expect("math_utils: scale_down ceil overflow")
@@ -294,31 +294,39 @@ pub fn prorate_interest(
     time_delta: u64,
     rounding: Rounding,
 ) -> u128 {
+    checked_prorate_interest(principal, rate_bps, time_delta, rounding)
+        .expect("math_utils: prorate overflow")
+}
+
+/// Checked variant of [`prorate_interest`] that returns `None` on overflow.
+///
+/// Contract code should prefer this function so an arithmetic overflow can be
+/// mapped to [`crate::types::ContractError::Overflow`] instead of a host panic.
+pub fn checked_prorate_interest(
+    principal: u128,
+    rate_bps: u32,
+    time_delta: u64,
+    rounding: Rounding,
+) -> Option<u128> {
     if principal == 0 || rate_bps == 0 || time_delta == 0 {
-        return 0;
+        return Some(0);
     }
 
-    // Step 1: principal × rate_bps  (fits in u128 for principal ≤ ~3.4 × 10^34)
-    let step1 = principal
-        .checked_mul(rate_bps as u128)
-        .expect("math_utils: prorate overflow (step1)");
+    // Step 1: principal × rate_bps
+    let step1 = principal.checked_mul(rate_bps as u128)?;
 
     // Step 2: step1 × time_delta
-    let step2 = step1
-        .checked_mul(time_delta as u128)
-        .expect("math_utils: prorate overflow (step2)");
+    let step2 = step1.checked_mul(time_delta as u128)?;
 
     // Step 3: divide by (BPS_DENOMINATOR × SECONDS_PER_YEAR) with rounding
     let quotient = step2 / BPS_YEAR_DENOM;
     match rounding {
-        Rounding::Floor => quotient,
+        Rounding::Floor => Some(quotient),
         Rounding::Ceil => {
-            if step2 % BPS_YEAR_DENOM != 0 {
-                quotient
-                    .checked_add(1)
-                    .expect("math_utils: prorate ceil overflow")
+            if step2.is_multiple_of(BPS_YEAR_DENOM) {
+                Some(quotient)
             } else {
-                quotient
+                quotient.checked_add(1)
             }
         }
     }

@@ -16,7 +16,7 @@ fn setup(start_ts: u64) -> (Env, Address, Address) {
     env.ledger().with_mut(|li| li.timestamp = start_ts);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -44,7 +44,7 @@ fn accrual_admin_cooldown_rejects_second_action_until_boundary() {
     let result = client.try_reinstate_credit_line(&borrower, &CreditStatus::Active);
     assert_eq!(
         result.err().unwrap().unwrap(),
-        ContractError::AdminCooldownActive.into()
+        ContractError::RiskAdminCooldownActive.into()
     );
 
     set_timestamp(&env, START_TS + COOLDOWN_SECONDS + 1);

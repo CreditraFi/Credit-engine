@@ -11,7 +11,7 @@ fn setup_with_token() -> (Env, Address, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
@@ -133,7 +133,7 @@ fn freeze_credit_line_requires_admin_auth() {
     let env = Env::default();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000, &300, &50);

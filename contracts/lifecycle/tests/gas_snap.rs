@@ -14,11 +14,12 @@
 
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::{
-    testutils::{budget::Budget, Address as _, Ledger},
+    testutils::{budget::Budget, Address as _},
     Address, Env,
 };
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct LifecycleGasSample {
     entrypoint: &'static str,
     cpu_instructions: u64,
@@ -52,10 +53,10 @@ fn setup() -> (Env, CreditClient<'static>, Address, Address) {
     env.mock_all_auths_allowing_non_root_auth();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
-    
+
     let token_id = env.register_stellar_asset_contract_v2(admin.clone());
     client.set_liquidity_token(&token_id.address());
     client.set_liquidity_source(&admin);
@@ -114,7 +115,7 @@ fn gas_reinstate_credit_line() {
     let (env, client, _admin, borrower) = setup_with_credit();
     client.default_credit_line(&borrower);
     snap("reinstate_credit_line", &env, || {
-        client.reinstate_credit_line(&borrower);
+        client.reinstate_credit_line(&borrower, &creditra_credit::types::CreditStatus::Active);
     });
 }
 
@@ -140,7 +141,7 @@ fn lifecycle_gas_summary() {
         client.default_credit_line(&borrower);
     });
     measure_one!("reinstate_credit_line", {
-        client.reinstate_credit_line(&borrower);
+        client.reinstate_credit_line(&borrower, &creditra_credit::types::CreditStatus::Active);
     });
     measure_one!("self_suspend_credit_line", {
         client.self_suspend_credit_line(&borrower);

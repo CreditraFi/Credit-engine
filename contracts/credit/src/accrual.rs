@@ -58,7 +58,7 @@ use crate::events::{
     publish_grace_waiver_applied_event, publish_interest_accrued_event,
     publish_penalty_rate_entered_event, publish_penalty_rate_exited_event, InterestAccruedEvent,
 };
-use crate::math_utils::{prorate_interest, Rounding};
+use crate::math_utils::{checked_prorate_interest, Rounding};
 use crate::storage::get_credit_line;
 use crate::storage::persist_credit_line;
 use crate::types::{
@@ -87,12 +87,11 @@ use soroban_sdk::{Address, Env, Vec};
 /// accrue as `0` for that period and are not carried forward.
 ///
 /// # Parameters
-/// - `env`:         The Soroban environment; used to read the current ledger
-///                  timestamp via `env.ledger().timestamp()`.
+/// - `env`: The Soroban environment; used to read the current ledger
+///   timestamp via `env.ledger().timestamp()`.
 /// - `credit_line`: Mutable reference to the credit line to update. Both
-///                  `accrued_interest` and `last_accrual_ts` are modified
-///                  in-place. The caller is responsible for persisting the
-///                  updated record to storage.
+///   `accrued_interest` and `last_accrual_ts` are modified in-place. The
+///   caller is responsible for persisting the updated record to storage.
 ///
 /// # Returns
 /// The amount of interest accrued in this call (may be `0` if `elapsed == 0`,
@@ -109,6 +108,7 @@ use soroban_sdk::{Address, Env, Vec};
 /// // interest = 1_000_000 * 500 * 86_400 / 315_360_000_000 = 137
 /// // After call: accrued_interest += 137, last_accrual_ts = 86_400
 /// ```
+#[allow(dead_code)]
 pub(crate) const SECONDS_PER_YEAR: u64 = 31_536_000;
 
 /// Compute simple interest: `utilized * rate_bps * seconds / (10_000 * SECONDS_PER_YEAR)`.
@@ -118,6 +118,7 @@ pub(crate) const SECONDS_PER_YEAR: u64 = 31_536_000;
 /// `i128::MAX` the function returns `Err(ContractError::Overflow)` so the caller
 /// can propagate it via `env.panic_with_error`. No silent wrapping or saturation
 /// occurs; the contract reverts deterministically.
+#[allow(dead_code)]
 fn compute_interest(utilized: i128, rate_bps: i128, seconds: i128) -> Result<i128, ContractError> {
     let denominator: i128 = 10_000 * (SECONDS_PER_YEAR as i128);
     let intermediate = utilized
@@ -179,7 +180,6 @@ fn compute_interest(utilized: i128, rate_bps: i128, seconds: i128) -> Result<i12
 /// assert!(updated_line.utilized_amount >= original_utilized);
 /// ```
 pub fn apply_accrual(env: &Env, mut line: CreditLineData) -> CreditLineData {
-
     let now = env.ledger().timestamp();
 
     // Do nothing if ledger time has not advanced.
@@ -202,6 +202,11 @@ pub fn apply_accrual(env: &Env, mut line: CreditLineData) -> CreditLineData {
             env.panic_with_error(ContractError::Overflow);
         }
         v as i128
+    };
+
+    let prorate = |principal: u128, rate_bps: u32, seconds: u64| -> u128 {
+        checked_prorate_interest(principal, rate_bps, seconds, Rounding::Floor)
+            .unwrap_or_else(|| env.panic_with_error(ContractError::Overflow))
     };
 
     // Check if the borrower is delinquent to apply penalty surcharge
@@ -257,51 +262,46 @@ pub fn apply_accrual(env: &Env, mut line: CreditLineData) -> CreditLineData {
                     // Entire period in grace window
                     match cfg.waiver_mode {
                         GraceWaiverMode::FullWaiver => 0u128,
-                        GraceWaiverMode::ReducedRate => prorate_interest(
+                        GraceWaiverMode::ReducedRate => prorate(
                             line.utilized_amount as u128,
                             cfg.reduced_rate_bps,
-                            (now - accrual_start) as u64,
-                            Rounding::Floor,
+                            now - accrual_start,
                         ),
                     }
                 } else if accrual_start >= grace_end {
                     // Entire period after grace window - use effective rate (may include penalty)
-                    prorate_interest(
+                    prorate(
                         line.utilized_amount as u128,
                         effective_rate_bps,
-                        (now - accrual_start) as u64,
-                        Rounding::Floor,
+                        now - accrual_start,
                     )
                 } else {
                     // Straddles grace boundary — prorate two sub-periods and add.
-                    let in_window_secs = (grace_end - accrual_start) as u64;
-                    let post_window_secs = (now - grace_end) as u64;
+                    let in_window_secs = grace_end - accrual_start;
+                    let post_window_secs = now - grace_end;
 
                     let in_window = match cfg.waiver_mode {
                         GraceWaiverMode::FullWaiver => 0u128,
-                        GraceWaiverMode::ReducedRate => prorate_interest(
+                        GraceWaiverMode::ReducedRate => prorate(
                             line.utilized_amount as u128,
                             cfg.reduced_rate_bps,
                             in_window_secs,
-                            Rounding::Floor,
                         ),
                     };
 
                     // Calculate waived amount for grace waiver event
-                    let full_rate_interest = prorate_interest(
+                    let full_rate_interest = prorate(
                         line.utilized_amount as u128,
                         effective_rate_bps,
                         in_window_secs,
-                        Rounding::Floor,
                     ) as i128;
 
                     let actual_interest = match cfg.waiver_mode {
                         GraceWaiverMode::FullWaiver => 0,
-                        GraceWaiverMode::ReducedRate => prorate_interest(
+                        GraceWaiverMode::ReducedRate => prorate(
                             line.utilized_amount as u128,
                             cfg.reduced_rate_bps,
                             in_window_secs,
-                            Rounding::Floor,
                         ) as i128,
                     };
 
@@ -315,31 +315,28 @@ pub fn apply_accrual(env: &Env, mut line: CreditLineData) -> CreditLineData {
                         );
                     }
 
-                    let post_window = prorate_interest(
+                    let post_window = prorate(
                         line.utilized_amount as u128,
                         effective_rate_bps,
                         post_window_secs,
-                        Rounding::Floor,
                     );
                     in_window
                         .checked_add(post_window)
                         .unwrap_or_else(|| env.panic_with_error(ContractError::Overflow))
                 }
             }
-            _ => prorate_interest(
+            _ => prorate(
                 line.utilized_amount as u128,
                 effective_rate_bps,
-                (now - accrual_start) as u64,
-                Rounding::Floor,
+                now - accrual_start,
             ),
         }
     } else {
         // Active, Defaulted, Restricted, or Closed status: apply effective rate (may include penalty)
-        prorate_interest(
+        prorate(
             line.utilized_amount as u128,
             effective_rate_bps,
-            (now - accrual_start) as u64,
-            Rounding::Floor,
+            now - accrual_start,
         )
     };
 
@@ -420,7 +417,6 @@ pub fn apply_accrual(env: &Env, mut line: CreditLineData) -> CreditLineData {
 /// accrue_batch(&env, borrowers);
 /// ```
 pub fn accrue_batch(env: &Env, borrowers: Vec<Address>) {
-
     for borrower in borrowers.iter() {
         if let Some(stored_line) = get_credit_line(env, &borrower) {
             if stored_line.status == CreditStatus::Active && stored_line.utilized_amount > 0 {

@@ -10,7 +10,7 @@ fn setup_env() -> (Env, Address, Address, Address) {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
     let token_address = token_id.address();
     CreditClient::new(&env, &contract_id).init(&admin);

@@ -7,6 +7,7 @@
 //! the liquidation process remains equal, accounting for all transfers between
 //! the credit contract, auction contract, and external parties.
 
+use soroban_sdk::testutils::Ledger;
 use creditra_credit::types::CreditStatus;
 use creditra_credit::{Credit, CreditClient};
 use gateway_auction::{Auction, AuctionClient, AuctionMode};
@@ -30,11 +31,11 @@ struct Deployment {
 /// Setup a defaulted credit line with auction contract deployed.
 fn setup_conservative_test(env: &Env, draw_amount: i128) -> Deployment {
     env.mock_all_auths_allowing_non_root_auth();
-    env.ledger().set_timestamp(START_TS);
+    env.ledger().with_mut(|l| l.timestamp = START_TS);
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let credit_id = env.register(Credit, ());
+    let credit_id = env.register(Credit, (admin.clone(),));
     let auction_id = env.register(Auction, ());
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(env));
     let token_address = token_id.address();
@@ -115,7 +116,7 @@ fn run_auction(
     auction.place_bid(settlement_id, &bidder, &first_bid);
     auction.place_bid(settlement_id, &winner, &recovered_amount);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
 
     auction.close_auction(settlement_id);
     auction.settle_default_liquidation(settlement_id, &deployment.credit_id, &deployment.borrower);
@@ -245,7 +246,7 @@ fn test_atomic_settlement_funds_conserved() {
     );
     auction.place_bid(&settlement_id, &winner, &recovered_amount);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
     auction.close_auction(&settlement_id);
 
     // Atomic settlement via credit contract

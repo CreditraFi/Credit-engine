@@ -164,8 +164,8 @@ fn saturating_mul_boundary_preserves_clamp_ordering() {
         let formula_result = compute_rate_from_score(&cfg, score);
 
         // With floor=0, ceiling=10_000: the formula already clamps to [0, 10_000].
-        let double_clamped = formula_result.max(0).min(MAX_INTEREST_RATE_BPS);
-        let single_clamped = raw.max(0).min(MAX_INTEREST_RATE_BPS).max(0);
+        let double_clamped = formula_result.clamp(0, MAX_INTEREST_RATE_BPS);
+        let single_clamped = raw.clamp(0, MAX_INTEREST_RATE_BPS);
 
         assert_eq!(
             double_clamped, single_clamped,
@@ -194,8 +194,8 @@ fn global_cap_edge_preserves_clamp_ordering() {
         let ceiling = 10_000;
         let double_clamped = formula_result.max(floor).min(ceiling);
 
-        let combined_lower = floor.max(cfg.min_rate_bps);
-        let combined_upper = ceiling.min(cfg.max_rate_bps).min(MAX_INTEREST_RATE_BPS);
+        let _combined_lower = floor.max(cfg.min_rate_bps);
+        let _combined_upper = ceiling.min(cfg.max_rate_bps).min(MAX_INTEREST_RATE_BPS);
         let true_lower = cfg.min_rate_bps.max(floor).min(ceiling);
         let true_upper = cfg
             .max_rate_bps
@@ -227,9 +227,9 @@ fn zero_bounds_preserve_clamp_ordering() {
         let formula_result = compute_rate_from_score(&cfg, score);
 
         // floor = 0, ceiling = 0
-        let double_clamped = formula_result.max(0).min(0);
-        let true_lower = cfg.min_rate_bps.max(0).min(0);
-        let true_upper = cfg.max_rate_bps.min(MAX_INTEREST_RATE_BPS).max(0).min(0);
+        let double_clamped = formula_result.clamp(0, 0);
+        let true_lower = cfg.min_rate_bps.clamp(0, 0);
+        let true_upper = cfg.max_rate_bps.min(MAX_INTEREST_RATE_BPS).clamp(0, 0);
         let single_clamped = raw.clamp(true_lower, true_upper);
 
         assert_eq!(
@@ -255,13 +255,12 @@ fn degenerate_range_preserves_clamp_ordering() {
         let formula_result = compute_rate_from_score(&cfg, score);
 
         // Degenerate: floor == ceiling == 3_000
-        let double_clamped = formula_result.max(3_000).min(3_000);
-        let true_lower = cfg.min_rate_bps.max(3_000).min(3_000);
+        let double_clamped = formula_result.clamp(3_000, 3_000);
+        let true_lower = cfg.min_rate_bps.clamp(3_000, 3_000);
         let true_upper = cfg
             .max_rate_bps
             .min(MAX_INTEREST_RATE_BPS)
-            .max(3_000)
-            .min(3_000);
+            .clamp(3_000, 3_000);
         let single_clamped = raw.clamp(true_lower, true_upper);
 
         assert_eq!(

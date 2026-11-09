@@ -15,7 +15,7 @@ fn setup(start_ts: u64) -> (Env, Address, Address) {
     env.ledger().with_mut(|li| li.timestamp = start_ts);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

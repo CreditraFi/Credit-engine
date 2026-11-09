@@ -13,7 +13,7 @@ fn test_protocol_summary_view_active_lines() {
     env.ledger().with_mut(|li| li.timestamp = 1000);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register_contract(None, Credit);
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     // Initialize with dummy token/source

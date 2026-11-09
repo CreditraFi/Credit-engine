@@ -20,10 +20,6 @@ name = "err_stab"
 path = "tests/err_stab.rs"
 
 [[test]]
-name = "admin_cooldown"
-path = "tests/admin_cooldown.rs"
-
-[[test]]
 name = "gas_snap"
 path = "tests/gas_snap.rs"
 

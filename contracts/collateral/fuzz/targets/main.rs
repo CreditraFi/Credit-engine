@@ -41,7 +41,7 @@ fuzz_target!(|actions: std::vec::Vec<AdminAction>| {
     env.ledger().with_mut(|li| li.timestamp = current_ts);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     // Initialize the main contract so admin is configured

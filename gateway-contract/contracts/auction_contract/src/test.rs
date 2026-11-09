@@ -9,7 +9,6 @@ mod tests {
 
     use soroban_sdk::testutils::Events as _;
     use soroban_sdk::testutils::{Address as _, Ledger};
-    use soroban_sdk::token::Client as TokenClient;
     use soroban_sdk::token::StellarAssetClient;
     use soroban_sdk::{Address, BytesN, Env, Symbol, TryFromVal, TryIntoVal};
 
@@ -53,13 +52,6 @@ mod tests {
                 .set(&Symbol::new(env, "bid_token"), &bid_token);
         });
         (bid_token, sac)
-    }
-
-    fn advance_ledgers(env: &Env, ledgers: u32) {
-        env.ledger().with_mut(|li| {
-            li.sequence_number += ledgers;
-            li.timestamp += (ledgers as u64) * 5;
-        });
     }
 
     fn next_u64(state: &mut u64) -> u64 {
@@ -134,7 +126,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -170,7 +162,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -214,7 +206,7 @@ mod tests {
             &1000_u32, // 10% min_increment_bps
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -266,7 +258,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -334,7 +326,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -386,11 +378,11 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
-        let mut seed: u64 = 0xdeadbeef_cafe_beef;
+        let mut seed: u64 = 0xdead_beef_cafe_beef;
         let mut highest = 0_i128;
         for _ in 0..8 {
             let idx = pick_index(&mut seed, 0..bidders.len());
@@ -443,7 +435,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.init_auction(
@@ -455,7 +447,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &bidder, &100_i128);
@@ -492,7 +484,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.init_auction(
@@ -504,7 +496,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &bidder, &420_i128);
@@ -544,7 +536,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.close_auction(&auction_id);
@@ -583,7 +575,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.init_auction(
@@ -595,7 +587,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.close_auction(&auction_id);
@@ -680,7 +672,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.close_auction(&auction_id);
@@ -728,7 +720,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -759,7 +751,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &bidder, &420_i128);
@@ -801,7 +793,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &bidder, &420_i128);
@@ -850,7 +842,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &bidder, &420_i128);
@@ -880,7 +872,7 @@ mod tests {
                 &10_001_u32,
                 &None,
                 &None,
-                &Some(DutchAuctionDecay::None),
+                &DutchAuctionDecay::None,
                 &None,
             );
         }));
@@ -904,7 +896,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.init_auction(
@@ -916,7 +908,7 @@ mod tests {
             &10_000_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
     }
@@ -942,7 +934,7 @@ mod tests {
             &100_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &alice, &1_000_i128);
@@ -983,7 +975,7 @@ mod tests {
             &100_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &alice, &1_000_i128);
@@ -1018,7 +1010,7 @@ mod tests {
             &333_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &alice, &1_000_i128);
@@ -1059,7 +1051,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &alice, &500_i128);
@@ -1101,7 +1093,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &winner, &100_i128);
@@ -1142,7 +1134,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &winner, &100_i128);
@@ -1181,7 +1173,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &winner, &100_i128);
@@ -1214,7 +1206,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.close_auction(&auction_id);
@@ -1249,7 +1241,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &winner, &420_i128);
@@ -1297,7 +1289,7 @@ mod tests {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -1335,7 +1327,7 @@ mod tests {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -1373,7 +1365,7 @@ mod tests {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -1415,7 +1407,7 @@ mod tests {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -1447,7 +1439,7 @@ mod tests {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -1652,7 +1644,7 @@ mod tests {
                 &0_u32,
                 &Some(500_i128),
                 &Some(100_i128),
-                &Some(DutchAuctionDecay::Stepped),
+                &DutchAuctionDecay::Stepped,
                 &None,
             );
         }));
@@ -1679,7 +1671,7 @@ mod tests {
                 &0_u32,
                 &Some(500_i128),
                 &Some(100_i128),
-                &Some(DutchAuctionDecay::Stepped),
+                &DutchAuctionDecay::Stepped,
                 &Some(0_u32),
             );
         }));
@@ -1708,7 +1700,7 @@ mod tests {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Stepped),
+            &DutchAuctionDecay::Stepped,
             &Some(4_u32),
         );
 
@@ -1749,7 +1741,7 @@ mod tests {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -1779,7 +1771,7 @@ mod tests {
             &bps,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
     }
@@ -1890,7 +1882,7 @@ mod tests {
             &10_000_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &alice, &100_i128);
@@ -1958,7 +1950,7 @@ mod reentrancy_exploration {
     extern crate std;
 
     use crate::{Auction, AuctionClient, AuctionMode, DutchAuctionDecay};
-    use soroban_sdk::testutils::{Address as _, Ledger as _};
+    use soroban_sdk::testutils::Address as _;
     use soroban_sdk::token::StellarAssetClient;
     use soroban_sdk::{Address, Env, Symbol};
 
@@ -2007,7 +1999,7 @@ mod reentrancy_exploration {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -2087,7 +2079,7 @@ mod reentrancy_exploration {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &winner, &100_i128);
@@ -2129,7 +2121,7 @@ mod reentrancy_exploration {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -2189,7 +2181,7 @@ mod reentrancy_preservation {
                 &0_u32,
                 &None,
                 &None,
-                &Some(DutchAuctionDecay::None),
+                &DutchAuctionDecay::None,
                 &None,
             );
             cli2.place_bid(&aid2, &Address::generate(&env2), &amount);
@@ -2227,7 +2219,7 @@ mod reentrancy_preservation {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -2264,7 +2256,7 @@ mod reentrancy_preservation {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &alice, &100_i128);
@@ -2295,7 +2287,7 @@ mod reentrancy_preservation {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         cli3.close_auction(&aid3);
@@ -2326,7 +2318,7 @@ mod reentrancy_preservation {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
         client.place_bid(&auction_id, &bidder, &420_i128);
@@ -2349,11 +2341,12 @@ mod reentrancy_preservation {
 // ── liquidation_grace_window ──────────────────────────────────────────────────
 #[cfg(test)]
 mod liquidation_grace_window {
+    use soroban_sdk::testutils::Ledger as _;
     extern crate std;
     use super::super::*;
     use crate::errors::AuctionError;
 
-    use soroban_sdk::testutils::{Address as _, Ledger as _};
+    use soroban_sdk::testutils::Address as _;
     use soroban_sdk::{Address, Env, Symbol};
 
     fn setup_grace_window_test(
@@ -2378,7 +2371,7 @@ mod liquidation_grace_window {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -2535,7 +2528,7 @@ mod liquidation_grace_window {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 
@@ -2570,7 +2563,7 @@ mod liquidation_grace_window {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -2609,7 +2602,7 @@ mod liquidation_grace_window {
             &0_u32,
             &Some(500_i128),
             &Some(100_i128),
-            &Some(DutchAuctionDecay::Linear),
+            &DutchAuctionDecay::Linear,
             &None,
         );
 
@@ -2680,7 +2673,7 @@ mod liquidation_grace_window {
             &0_u32,
             &None,
             &None,
-            &Some(DutchAuctionDecay::None),
+            &DutchAuctionDecay::None,
             &None,
         );
 

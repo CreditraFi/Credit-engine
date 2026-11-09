@@ -460,11 +460,11 @@ fn test_storage_isolation_real_contract_operations() {
     env.mock_all_auths();
 
     // Register the contract
-    let contract_id = env.register(Credit, ());
+    let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = creditra_credit::CreditClient::new(&env, &contract_id);
 
     // Initialize the contract
-    let admin = Address::generate(&env);
     client.init(&admin);
 
     // Generate multiple borrowers
@@ -512,10 +512,10 @@ fn test_storage_isolation_large_scale() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(Credit, ());
+    let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = creditra_credit::CreditClient::new(&env, &contract_id);
 
-    let admin = Address::generate(&env);
     client.init(&admin);
 
     // Generate many borrowers
@@ -572,10 +572,10 @@ fn test_edge_case_same_address_multiple_operations() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(Credit, ());
+    let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = creditra_credit::CreditClient::new(&env, &contract_id);
 
-    let admin = Address::generate(&env);
     client.init(&admin);
 
     let borrower = Address::generate(&env);
@@ -709,7 +709,6 @@ fn test_documentation_collision_resistance_guarantee() {
     // theoretical guarantee.
 
     // This test serves as documentation of the collision resistance guarantee
-    assert!(true, "Collision resistance is mathematically guaranteed");
 }
 
 // ============================================================================

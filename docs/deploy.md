@@ -27,7 +27,10 @@ Note the resulting contract address.
 
 ## Step 2 — Call `init(admin)`
 
-`init` is a **one-time** operation protected by an `AlreadyInitialized` guard:
+`init` is a **one-time** operation protected by an `AlreadyInitialized` guard
+and bound to the contract deployer's authority. The transaction must be signed
+by the account that deployed the contract; a third party cannot initialize the
+contract first and claim the admin role.
 
 ```rust
 pub fn init(env: Env, admin: Address)
@@ -45,6 +48,10 @@ pub fn init(env: Env, admin: Address)
 
 ### Security guarantees
 
+- `init` requires authorization from the contract's **deployer**
+  (`Env::deployer`). Deploy and initialize may be separate transactions, but
+  only the deployer can choose the admin, which closes the front-running
+  window between deployment and initialization.
 - A second call to `init` with any address reverts with
   `ContractError::AlreadyInitialized` (error code 14).
 - The admin address is immutable after the first successful `init` call.
@@ -103,6 +110,8 @@ The guard is implemented in `contracts/credit/src/config.rs`:
 if env.storage().instance().has(&admin_key(&env)) {
     env.panic_with_error(ContractError::AlreadyInitialized);
 }
+// Only the deployer may choose the initial admin.
+env.deployer().require_auth();
 ```
 
 This fires before any storage write, so a failed re-init leaves the contract

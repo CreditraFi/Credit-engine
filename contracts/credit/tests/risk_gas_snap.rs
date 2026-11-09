@@ -18,7 +18,7 @@
 
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::{
-    testutils::{budget::Budget, Address as _, Ledger},
+    testutils::{budget::Budget, Address as _},
     Address, Env,
 };
 
@@ -26,6 +26,7 @@ use soroban_sdk::{
 
 /// Single entrypoint gas snapshot, serialised by `insta` for regression tracking.
 #[derive(Debug)]
+#[allow(dead_code)]
 struct RiskGasSample {
     entrypoint: &'static str,
     cpu_instructions: u64,
@@ -61,7 +62,7 @@ fn setup() -> (Env, CreditClient<'static>, Address, Address) {
     env.mock_all_auths_allowing_non_root_auth();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let credit_id = env.register(Credit, ());
+    let credit_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &credit_id);
     client.init(&admin);
     (env, client, admin, borrower)
@@ -88,7 +89,7 @@ fn setup_with_token() -> (Env, CreditClient<'static>, Address, Address) {
     token.mint(&admin, &1_000_000_000_i128);
     token.mint(&borrower, &500_000_000_i128);
 
-    let credit_id = env.register(Credit, ());
+    let credit_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &credit_id);
 
     token_client.approve(&borrower, &credit_id, &500_000_000_i128, &2000_u32);

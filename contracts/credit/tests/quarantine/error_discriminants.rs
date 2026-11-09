@@ -27,7 +27,7 @@ fn error_discriminants_are_stable() {
     assert_eq!(ContractError::UtilizationNotZero as u32, 10);
     assert_eq!(ContractError::Reentrancy as u32, 11);
     assert_eq!(ContractError::Overflow as u32, 12);
-//     assert_eq!(ContractError::LimitDecreaseRequiresRepayment as u32, 13);
+    //     assert_eq!(ContractError::LimitDecreaseRequiresRepayment as u32, 13);
     assert_eq!(ContractError::AlreadyInitialized as u32, 14);
     assert_eq!(ContractError::AdminAcceptTooEarly as u32, 15);
     assert_eq!(ContractError::BorrowerBlocked as u32, 16);
@@ -89,7 +89,7 @@ fn no_duplicate_discriminants() {
         ContractError::UtilizationNotZero as u32,
         ContractError::Reentrancy as u32,
         ContractError::Overflow as u32,
-//         ContractError::LimitDecreaseRequiresRepayment as u32,
+        //         ContractError::LimitDecreaseRequiresRepayment as u32,
         ContractError::AlreadyInitialized as u32,
         ContractError::AdminAcceptTooEarly as u32,
         ContractError::BorrowerBlocked as u32,
@@ -159,7 +159,7 @@ fn variant_count_is_known() {
         ContractError::UtilizationNotZero as u32,
         ContractError::Reentrancy as u32,
         ContractError::Overflow as u32,
-//         ContractError::LimitDecreaseRequiresRepayment as u32,
+        //         ContractError::LimitDecreaseRequiresRepayment as u32,
         ContractError::AlreadyInitialized as u32,
         ContractError::AdminAcceptTooEarly as u32,
         ContractError::BorrowerBlocked as u32,
@@ -561,7 +561,7 @@ fn borrow_error_catalog_lists_all_variants() {
         "UtilizationNotZero",
         "Reentrancy",
         "Overflow",
-//         "LimitDecreaseRequiresRepayment",
+        //         "LimitDecreaseRequiresRepayment",
         "AlreadyInitialized",
         "QuorumNotMet",
         "OracleNotFound",
@@ -633,7 +633,7 @@ fn every_variant_has_known_category() {
         ContractError::UtilizationNotZero.category(),
         ContractError::Reentrancy.category(),
         ContractError::Overflow.category(),
-//         ContractError::LimitDecreaseRequiresRepayment.category(),
+        //         ContractError::LimitDecreaseRequiresRepayment.category(),
         ContractError::AlreadyInitialized.category(),
         ContractError::AdminAcceptTooEarly.category(),
         ContractError::BorrowerBlocked.category(),
@@ -708,7 +708,7 @@ mod error_path_tests {
         env.mock_all_auths();
 
         let admin = Address::generate(&env);
-        let contract_id = env.register_contract(None, Credit);
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -732,25 +732,16 @@ mod error_path_tests {
     // ─────────────────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_admin_not_initialized_error() {
+    fn constructor_pins_admin_at_deployment() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, Credit);
+        let admin = Address::generate(&env);
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         let borrower = Address::generate(&env);
-
-        // Try to open credit line without initializing admin
-        let result = client.try_open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
-
-        assert!(result.is_err(), "Expected error when admin not initialized");
-        let err = result.err().unwrap();
-        assert_eq!(
-            err.unwrap(),
-            ContractError::AdminNotInitialized.into(),
-            "Expected AdminNotInitialized error"
-        );
+        client.open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

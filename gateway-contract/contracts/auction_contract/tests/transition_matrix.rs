@@ -45,6 +45,7 @@ enum Entrypoint {
 
 /// One row of the status × entrypoint matrix for a given auction mode.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct TransitionCase {
     label: &'static str,
     mode: AuctionMode,
@@ -181,7 +182,7 @@ fn init_auction(client: &AuctionClient<'_>, auction_id: &Symbol, mode: AuctionMo
                 &0_u32,
                 &None,
                 &None,
-                &Some(gateway_auction::DutchAuctionDecay::None),
+                &gateway_auction::DutchAuctionDecay::None,
                 &None,
             );
         }
@@ -195,7 +196,7 @@ fn init_auction(client: &AuctionClient<'_>, auction_id: &Symbol, mode: AuctionMo
                 &0_u32,
                 &Some(500_i128),
                 &Some(100_i128),
-                &Some(DutchAuctionDecay::None),
+                &DutchAuctionDecay::None,
                 &None,
             );
             client.env.ledger().with_mut(|li| li.timestamp = 1_000);
@@ -229,7 +230,7 @@ fn setup_auction(mode: AuctionMode, from: AuctionStatus) -> (Env, Address, Symbo
 
     init_auction(&client, &auction_id, mode);
 
-    match (mode, from.clone()) {
+    match (mode, from) {
         (_, AuctionStatus::Open) => {}
         (AuctionMode::English, AuctionStatus::Closed) => {
             client.place_bid(&auction_id, &winner, &100_i128);
@@ -286,7 +287,7 @@ fn invoke_entrypoint(
 
 fn run_matrix(mode: AuctionMode) {
     for case in transition_matrix(mode) {
-        let from = case.from.clone();
+        let from = case.from;
         let (env, contract_id, auction_id, _winner) = setup_auction(mode, from);
         let client = AuctionClient::new(&env, &contract_id);
         let status_before = read_status(&env, &contract_id, &auction_id);

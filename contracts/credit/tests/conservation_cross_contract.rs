@@ -13,9 +13,9 @@
 use creditra_credit::types::CreditStatus;
 use creditra_credit::{Credit, CreditClient};
 use gateway_auction::{Auction, AuctionClient, AuctionMode, AuctionState, DutchAuctionDecay};
-use soroban_sdk::testutils::{Address as _, Events as _, Ledger};
+use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::token::StellarAssetClient;
-use soroban_sdk::{contracttype, Address, Env, Symbol, TryFromVal, TryIntoVal};
+use soroban_sdk::{contracttype, Address, Env, Symbol};
 
 const CREDIT_LIMIT: i128 = 10_000;
 const INTEREST_RATE_BPS: u32 = 0;
@@ -44,7 +44,7 @@ fn setup_defaulted_credit(env: &Env, draw_amount: i128) -> Deployment {
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let credit_id = env.register(Credit, ());
+    let credit_id = env.register(Credit, (admin.clone(),));
     let auction_id = env.register(Auction, ());
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(env));
     let token_address = token_id.address();
@@ -106,11 +106,7 @@ fn run_auction(env: &Env, deployment: &Deployment, settlement_id: &Symbol, highe
     auction.close_auction(settlement_id);
 }
 
-fn get_auction_state(
-    env: &Env,
-    auction_id: &Address,
-    settlement_id: &Symbol,
-) -> AuctionState {
+fn get_auction_state(env: &Env, auction_id: &Address, settlement_id: &Symbol) -> AuctionState {
     env.as_contract(auction_id, || {
         env.storage().persistent().get(settlement_id).unwrap()
     })

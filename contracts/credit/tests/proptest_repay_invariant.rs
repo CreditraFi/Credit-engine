@@ -66,7 +66,7 @@ fn setup(env: &Env) -> (CreditClient<'_>, Address, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -110,7 +110,7 @@ proptest! {
         ).prop_filter("draw must be <= credit limit", |(cl, draw, _, _)| draw <= cl)
     ) {
         let env = Env::default();
-        env.ledger().set_timestamp(1_000);
+        env.ledger().with_mut(|l| l.timestamp = 1_000);
 
         let (client, _token, _contract_id, borrower) = setup(&env);
 
@@ -127,7 +127,7 @@ proptest! {
         let utilized_before = line_before.utilized_amount;
 
         // Advance time to accrue interest
-        env.ledger().set_timestamp(1_000 + delta);
+        env.ledger().with_mut(|l| l.timestamp = 1_000 + delta);
 
         // Repay
         client.repay_credit(&borrower, &repay);
@@ -226,7 +226,7 @@ fn overpayment_is_capped_and_never_increases_utilization() {
 #[test]
 fn full_repay_after_interest_decreases_utilization() {
     let env = Env::default();
-    env.ledger().set_timestamp(1_000);
+    env.ledger().with_mut(|l| l.timestamp = 1_000);
 
     let (client, _token, _contract_id, borrower) = setup(&env);
 
@@ -238,7 +238,7 @@ fn full_repay_after_interest_decreases_utilization() {
     assert_eq!(utilized_before, 10_000);
 
     // Advance by 1 year — interest will accrue
-    env.ledger().set_timestamp(1_000 + 31_536_000);
+    env.ledger().with_mut(|l| l.timestamp = 1_000 + 31_536_000);
 
     // Repay more than original principal to cover interest
     client.repay_credit(&borrower, &20_000);
@@ -265,7 +265,7 @@ fn repay_one_borrower_does_not_affect_another() {
     let admin = Address::generate(&env);
     let borrower_a = Address::generate(&env);
     let borrower_b = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

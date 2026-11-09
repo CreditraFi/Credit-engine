@@ -57,10 +57,10 @@ impl TestCtx {
 fn setup() -> TestCtx {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
-    env.ledger().set_timestamp(INITIAL_TIMESTAMP);
+    env.ledger().with_mut(|l| l.timestamp = INITIAL_TIMESTAMP);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

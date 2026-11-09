@@ -4,8 +4,9 @@
 //!
 //! # What is tested
 //!
-//! 1. Double-init reverts with `AlreadyInitialized`.
-//! 2. Admin is unchanged after a failed re-init attempt.
+//! 1. The constructor pins the admin atomically at deployment.
+//! 2. Re-init with a different admin reverts with `AlreadyInitialized`.
+//! 3. Re-init with the same admin is an idempotent no-op.
 //! 3. No state is mutated by a failed re-init.
 //! 4. LiquiditySource is set to the contract address on first init.
 //! 5. Admin-gated functions work after init and fail before init.
@@ -23,7 +24,7 @@ use creditra_credit::{Credit, CreditClient, FreezeReason};
 
 fn deploy(env: &Env) -> (CreditClient<'_>, Address) {
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     (client, admin)
 }
@@ -85,9 +86,9 @@ fn failed_reinit_does_not_mutate_state() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(Credit, ());
-    let client = CreditClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
+    let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);
 
@@ -133,20 +134,19 @@ fn init_sets_liquidity_source_to_contract_address() {
 // 5. Admin-gated functions fail before init
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Calling an admin-gated function before init must revert because no admin
-/// is stored.
+/// The constructor pins the admin during deployment, so an admin-gated
+/// function is usable immediately without a separate `init` transaction.
 #[test]
-#[should_panic]
-fn admin_gated_call_before_init_reverts() {
+fn admin_gated_call_works_immediately_after_deploy() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register(Credit, ());
+    let admin = Address::generate(&env);
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
-    // No init call — admin is not set — this must panic.
-    // freeze_draws requires admin auth and will fail because no admin is stored.
     client.freeze_draws(&FreezeReason::LiquidityReserve);
+    assert!(client.is_draws_frozen());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,9 +161,8 @@ fn init_is_independent_across_contract_instances() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-
-    let contract_a = env.register(Credit, ());
-    let contract_b = env.register(Credit, ());
+    let contract_a = env.register(Credit, (admin.clone(),));
+    let contract_b = env.register(Credit, (admin.clone(),));
     let client_a = CreditClient::new(&env, &contract_a);
     let client_b = CreditClient::new(&env, &contract_b);
 
@@ -206,16 +205,22 @@ fn single_init_succeeds() {
 // 8. Re-init with same admin also reverts
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Even re-init with the original admin address must revert — init is strictly
-/// one-time regardless of the caller.
+/// Re-init with the admin already pinned by the constructor is an idempotent
+/// no-op, so legacy callers do not break after upgrading to constructor-based
+/// initialization.
 #[test]
-#[should_panic(expected = "Error(Contract, #14)")]
-fn reinit_with_same_admin_also_reverts() {
+fn reinit_with_same_admin_is_idempotent() {
     let env = Env::default();
     env.mock_all_auths();
 
     let (client, admin) = deploy(&env);
     client.init(&admin);
-    // Same admin — still must revert.
-    client.init(&admin);
+
+    // The admin is unchanged and the contract remains usable.
+    let borrower = Address::generate(&env);
+    client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
+    assert_eq!(
+        client.get_credit_line(&borrower).unwrap().credit_limit,
+        1_000
+    );
 }

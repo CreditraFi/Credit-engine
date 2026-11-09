@@ -26,7 +26,7 @@ use creditra_query::events::{
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Events, Ledger},
-    token, Address, Env, IntoVal,
+    token, Address, Env,
 };
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ fn setup() -> (Env, Address, Address) {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -59,7 +59,7 @@ fn setup() -> (Env, Address, Address) {
 fn credit_line_queried_event_found_true_emits_correct_topic_and_payload() {
     let (env, contract_id, _admin) = setup();
     let borrower = Address::generate(&env);
-    env.ledger().set_timestamp(1_000);
+    env.ledger().with_mut(|l| l.timestamp = 1_000);
 
     let event = CreditLineQueriedEvent {
         borrower: borrower.clone(),
@@ -93,7 +93,7 @@ fn credit_line_queried_event_found_true_emits_correct_topic_and_payload() {
 fn credit_line_queried_event_found_false_encodes_correctly() {
     let (env, contract_id, _admin) = setup();
     let borrower = Address::generate(&env);
-    env.ledger().set_timestamp(42);
+    env.ledger().with_mut(|l| l.timestamp = 42);
 
     let event = CreditLineQueriedEvent {
         borrower: borrower.clone(),
@@ -121,7 +121,7 @@ fn credit_line_queried_event_found_false_encodes_correctly() {
 fn health_factor_queried_event_emits_correct_topic_and_value() {
     let (env, contract_id, _admin) = setup();
     let borrower = Address::generate(&env);
-    env.ledger().set_timestamp(500);
+    env.ledger().with_mut(|l| l.timestamp = 500);
 
     let event = HealthFactorQueriedEvent {
         borrower: borrower.clone(),
@@ -177,7 +177,7 @@ fn health_factor_queried_event_max_sentinel_encodes_correctly() {
 fn delinquency_checked_event_true_emits_correct_topic_and_flag() {
     let (env, contract_id, _admin) = setup();
     let borrower = Address::generate(&env);
-    env.ledger().set_timestamp(9_999);
+    env.ledger().with_mut(|l| l.timestamp = 9_999);
 
     let event = DelinquencyCheckedEvent {
         borrower: borrower.clone(),
@@ -231,7 +231,7 @@ fn delinquency_checked_event_false_encodes_correctly() {
 #[test]
 fn protocol_summary_queried_event_emits_correct_topic_and_payload() {
     let (env, contract_id, _admin) = setup();
-    env.ledger().set_timestamp(2_000);
+    env.ledger().with_mut(|l| l.timestamp = 2_000);
 
     let event = ProtocolSummaryQueriedEvent {
         total_utilized: 100_000_i128,
@@ -288,7 +288,7 @@ fn protocol_summary_queried_event_zero_state_encodes_correctly() {
 fn events_are_deterministic_same_input_same_output() {
     let (env, contract_id, _admin) = setup();
     let borrower = Address::generate(&env);
-    env.ledger().set_timestamp(777);
+    env.ledger().with_mut(|l| l.timestamp = 777);
 
     let event = CreditLineQueriedEvent {
         borrower: borrower.clone(),

@@ -59,8 +59,8 @@
 //! full per-variant tier table.
 
 use crate::types::{
-    ContractError, CreditLineData, CreditStatus, DrawsFreezeState, GracePeriodConfig,
-    RepaymentSchedule, TreasuryWithdrawalProposal,
+    ContractError, CreditLineData, CreditStatus, GracePeriodConfig, RepaymentSchedule,
+    TreasuryWithdrawalProposal,
 };
 use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
 
@@ -767,6 +767,9 @@ pub fn get_grace_period_config(env: &Env) -> Option<GracePeriodConfig> {
 /// Return the per-borrower liquidation grace period in seconds (0 if not configured).
 pub fn get_per_borrower_liquidation_grace(env: &Env, borrower: &Address) -> u64 {
     let key = DataKey::LiquidationGracePeriod(borrower.clone());
+    if !env.storage().persistent().has(&key) {
+        return 0;
+    }
     bump_persistent_ttl(env, &key);
     env.storage().persistent().get(&key).unwrap_or(0)
 }

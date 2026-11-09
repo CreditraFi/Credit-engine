@@ -4,7 +4,7 @@ use creditra_credit::instrument::{
 };
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
-    token, Address, Env,
+    Address, Env,
 };
 use std::path::Path;
 

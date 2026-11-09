@@ -61,7 +61,7 @@ fn setup(env: &Env) -> (CreditClient<'_>, std::vec::Vec<Address>) {
     env.ledger().with_mut(|l| l.timestamp = 1_000);
 
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 

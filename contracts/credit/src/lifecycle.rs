@@ -92,17 +92,14 @@ use crate::auth::{require_admin, require_admin_auth};
 use crate::events::{
     publish_borrow_lifecycle_event, publish_credit_line_event, publish_debt_forgiven_event,
     publish_default_liquidation_requested_event, publish_default_liquidation_settled_event,
-    publish_late_fee_charged_event, BorrowLifecycleEvent, BorrowLifecyclePhase, CreditLineEvent,
-    DebtForgivenEvent, DefaultLiquidationSettledEvent, LateFeeChargedEvent,
+    BorrowLifecycleEvent, BorrowLifecyclePhase, CreditLineEvent, DebtForgivenEvent,
+    DefaultLiquidationSettledEvent,
 };
 use crate::risk::{MAX_INTEREST_RATE_BPS, MAX_RISK_SCORE};
 use crate::storage::{
-    add_treasury_balance as storage_add_treasury_balance, assert_not_paused, assert_ts_monotonic,
-    bump_credit_line_ttl, clear_repayment_schedule, get_credit_line,
-    get_late_fee_flat as storage_get_late_fee_flat, get_repayment_schedule, persist_credit_line,
-    set_late_fee_flat as storage_set_late_fee_flat,
-    set_repayment_schedule as storage_set_repayment_schedule, CREDIT_LINE_TTL_EXTEND_TO,
-    CREDIT_LINE_TTL_THRESHOLD,
+    assert_not_paused, assert_ts_monotonic, bump_credit_line_ttl, clear_repayment_schedule,
+    get_credit_line, get_repayment_schedule, persist_credit_line,
+    set_repayment_schedule as storage_set_repayment_schedule,
 };
 use crate::types::{ContractError, CreditLineData, CreditStatus, RepaymentSchedule};
 use soroban_sdk::{symbol_short, Address, Env, Symbol, Vec};
@@ -803,12 +800,6 @@ pub fn settle_default_liquidation(
     );
 }
 
-/// Forgive outstanding debt without transferring tokens (admin only).
-///
-/// This is an accounting-only write-off path intended for explicit admin debt
-/// relief or off-chain settlements that have already been handled elsewhere.
-/// The forgiven amount is capped to the current `utilized_amount`.
-
 // ── reinstate_credit_line ─────────────────────────────────────────────────────
 
 /// Reinstate a `Defaulted` credit line to either `Active` or `Restricted` (admin only).
@@ -1006,7 +997,7 @@ mod self_suspend {
         env.mock_all_auths();
         let admin = Address::generate(env);
         let borrower = Address::generate(env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(env, &contract_id);
         client.init(&admin);
         client.open_credit_line(&borrower, &1_000_i128, &500_u32, &50_u32);
@@ -1036,7 +1027,7 @@ mod self_suspend {
         let env = Env::default();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
         client.open_credit_line(&borrower, &1_000_i128, &500_u32, &50_u32);
@@ -1080,21 +1071,20 @@ mod self_suspend {
 
 #[cfg(test)]
 mod installment {
-    use crate::events::LateFeeChargedEvent;
     use crate::types::CreditStatus;
     use crate::Credit;
     use crate::CreditClient;
     use soroban_sdk::{
-        testutils::{Address as _, Events as _, Ledger},
+        testutils::{Address as _, Ledger},
         token::StellarAssetClient,
-        Address, Env, Symbol, TryFromVal, TryIntoVal,
+        Address, Env, Symbol,
     };
 
-    fn setup_borrower(env: &Env) -> (CreditClient, Address) {
+    fn setup_borrower<'a>(env: &'a Env) -> (CreditClient<'a>, Address) {
         env.mock_all_auths();
         let admin = Address::generate(env);
         let borrower = Address::generate(env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(env, &contract_id);
         client.init(&admin);
         let token_id = env.register_stellar_asset_contract_v2(Address::generate(env));
@@ -1115,7 +1105,7 @@ mod installment {
     }
 
     fn with_schedule(
-        env: &Env,
+        _env: &Env,
         client: &CreditClient,
         borrower: &Address,
         amount_per_period: i128,
@@ -1132,7 +1122,7 @@ mod installment {
         draw_amount: i128,
         at_ts: u64,
     ) {
-        env.ledger().set_timestamp(at_ts);
+        env.ledger().with_mut(|l| l.timestamp = at_ts);
         client.draw_credit(borrower, &draw_amount);
     }
 
@@ -1153,7 +1143,7 @@ mod installment {
         client.set_late_fee_flat(&50_i128);
 
         // Advance time past the due date (t=300, due was at t=200)
-        env.ledger().set_timestamp(300);
+        env.ledger().with_mut(|l| l.timestamp = 300);
 
         // Repay 100_000 (covers 1 installment, which is overdue)
         let treasury_before = client.get_protocol_summary().treasury_balance;
@@ -1179,7 +1169,7 @@ mod installment {
 
         // Do NOT set any late fee (defaults to 0)
 
-        env.ledger().set_timestamp(300);
+        env.ledger().with_mut(|l| l.timestamp = 300);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
         client.repay_credit(&borrower, &100_000);
@@ -1205,7 +1195,7 @@ mod installment {
 
         // Advance time well past 4 due dates
         // Due dates: 200, 300, 400, 500 — all past by t=600
-        env.ledger().set_timestamp(600);
+        env.ledger().with_mut(|l| l.timestamp = 600);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
 
@@ -1232,7 +1222,7 @@ mod installment {
         client.set_late_fee_flat(&50_i128);
 
         // Repay before the due date
-        env.ledger().set_timestamp(150);
+        env.ledger().with_mut(|l| l.timestamp = 150);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
         client.repay_credit(&borrower, &100_000);
@@ -1255,7 +1245,7 @@ mod installment {
         // Set fee to 0 (explicitly disabled)
         client.set_late_fee_flat(&0_i128);
 
-        env.ledger().set_timestamp(300);
+        env.ledger().with_mut(|l| l.timestamp = 300);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
         client.repay_credit(&borrower, &100_000);
@@ -1275,7 +1265,7 @@ mod installment {
 
         client.set_late_fee_flat(&50_i128);
 
-        env.ledger().set_timestamp(300);
+        env.ledger().with_mut(|l| l.timestamp = 300);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
         client.repay_credit(&borrower, &100_000);
@@ -1296,7 +1286,7 @@ mod installment {
 
         client.set_late_fee_flat(&50_i128);
 
-        env.ledger().set_timestamp(300);
+        env.ledger().with_mut(|l| l.timestamp = 300);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
 
@@ -1314,7 +1304,7 @@ mod installment {
         let env = Env::default();
         env.mock_all_auths();
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
         client.set_late_fee_flat(&-1_i128);
@@ -1334,7 +1324,7 @@ mod installment {
 
         // Advance to t=250: installment 1 (due 200) is overdue,
         // installment 2 (due 300) is not yet due
-        env.ledger().set_timestamp(250);
+        env.ledger().with_mut(|l| l.timestamp = 250);
 
         let treasury_before = client.get_protocol_summary().treasury_balance;
 
@@ -1354,14 +1344,14 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
         client.open_credit_line(&borrower, &1_000_000, &500, &100);
         client.draw_credit(&borrower, &500_000);
 
-        env.ledger().set_timestamp(3600);
+        env.ledger().with_mut(|l| l.timestamp = 3600);
         client.default_credit_line(&borrower);
 
         let before = client.get_credit_line(&borrower).unwrap();
@@ -1392,14 +1382,14 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
         client.open_credit_line(&borrower, &1_000_000, &500, &100);
         client.draw_credit(&borrower, &100_000);
 
-        env.ledger().set_timestamp(3600);
+        env.ledger().with_mut(|l| l.timestamp = 3600);
         client.default_credit_line(&borrower);
 
         let before = client.get_credit_line(&borrower).unwrap();
@@ -1428,7 +1418,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1436,7 +1426,7 @@ mod installment {
         client.open_credit_line(&borrower, &1_000_000, &500, &100);
         client.draw_credit(&borrower, &100_000);
 
-        env.ledger().set_timestamp(3600);
+        env.ledger().with_mut(|l| l.timestamp = 3600);
         client.default_credit_line(&borrower);
 
         let before = client.get_credit_line(&borrower).unwrap();
@@ -1460,7 +1450,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1488,7 +1478,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1515,7 +1505,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1542,7 +1532,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1554,7 +1544,7 @@ mod installment {
         let settlement_id = Symbol::new(&env, "settle_replay");
 
         // First settlement succeeds
-        client.settle_default_liquidation(&borrower, &50_000, &settlement_id, &5_000);
+        client.settle_default_liquidation(&borrower, &50_000, &settlement_id, &5_000, &None);
 
         // Second settlement with same (borrower, settlement_id) should fail
         client.settle_default_liquidation(
@@ -1562,6 +1552,7 @@ mod installment {
             &25_000,
             &settlement_id, // Same ID
             &5_000,
+            &None,
         );
     }
 
@@ -1572,7 +1563,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1592,6 +1583,7 @@ mod installment {
             &recovery_1,
             &settlement_id_1,
             &3_333, // ~33%
+            &None,
         );
 
         let after_round_1 = client.get_credit_line(&borrower).unwrap();
@@ -1606,6 +1598,7 @@ mod installment {
             &recovery_2,
             &settlement_id_2,
             &5_000, // 50%
+            &None,
         );
 
         let after_round_2 = client.get_credit_line(&borrower).unwrap();
@@ -1623,6 +1616,7 @@ mod installment {
             &recovery_3,
             &settlement_id_3,
             &10_000, // 100%
+            &None,
         );
 
         let after_round_3 = client.get_credit_line(&borrower).unwrap();
@@ -1638,7 +1632,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1653,6 +1647,7 @@ mod installment {
             &0, // Invalid: zero recovered amount
             &settlement_id,
             &5_000,
+            &None,
         );
     }
 
@@ -1664,7 +1659,7 @@ mod installment {
         env.mock_all_auths();
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -1674,6 +1669,6 @@ mod installment {
         // No default call - line is still Active
 
         let settlement_id = Symbol::new(&env, "settle_active");
-        client.settle_default_liquidation(&borrower, &50_000, &settlement_id, &5_000);
+        client.settle_default_liquidation(&borrower, &50_000, &settlement_id, &5_000, &None);
     }
 }

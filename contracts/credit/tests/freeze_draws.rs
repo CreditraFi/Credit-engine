@@ -19,7 +19,7 @@ fn setup() -> (Env, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     (env, admin, contract_id)
@@ -225,7 +225,10 @@ fn freeze_draws_idempotent() {
 
     // Freeze again - should succeed and remain frozen
     client.freeze_draws(&FreezeReason::LiquidityReserve);
-    assert!(client.is_draws_frozen(), "should remain frozen after redundant freeze");
+    assert!(
+        client.is_draws_frozen(),
+        "should remain frozen after redundant freeze"
+    );
 }
 
 #[test]
@@ -235,5 +238,8 @@ fn unfreeze_draws_idempotent() {
 
     // Unfreeze when already unfrozen - should succeed
     client.unfreeze_draws();
-    assert!(!client.is_draws_frozen(), "should remain unfrozen after redundant unfreeze");
+    assert!(
+        !client.is_draws_frozen(),
+        "should remain unfrozen after redundant unfreeze"
+    );
 }

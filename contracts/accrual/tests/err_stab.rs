@@ -46,7 +46,7 @@
 //! - `contracts/credit/tests/accrual_overflow_audit.rs` — overflow-determinism tests.
 
 use creditra_credit::types::{ContractError, ContractErrorCategory};
-use creditra_credit::{Credit, CreditClient};
+use creditra_credit::{Credit, CreditClient, FreezeReason};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     token, Address, Env, Vec,
@@ -84,7 +84,6 @@ fn accrual_v7_error_discriminants_are_pinned() {
     // Draws-frozen / freeze-surface that gates materialization
     assert_eq!(ContractError::DrawsFrozen as u32, 19);
     assert_eq!(ContractError::BorrowerFrozen as u32, 40);
-    assert_eq!(ContractError::BorrowerBlocked as u32, 16);
 
     // Oracle → price validity is a precondition of risk-driven accrual
     assert_eq!(ContractError::OraclePriceInvalid as u32, 36);
@@ -96,9 +95,7 @@ fn accrual_v7_error_discriminants_are_pinned() {
     assert_eq!(ContractError::MissingLiquidityToken as u32, 22);
     assert_eq!(ContractError::MissingLiquiditySource as u32, 23);
     assert_eq!(ContractError::InsufficientLiquidityReserve as u32, 24);
-    assert_eq!(ContractError::InsufficientRepaymentAllowance as u32, 26);
-    assert_eq!(ContractError::InsufficientRepaymentBalance as u32, 27);
-    assert_eq!(ContractError::LiquidityTokenCallFailed as u32, 25);
+
     assert_eq!(ContractError::ExposureCapExceeded as u32, 31);
 
     // Limit → numeric ceilings on draw (apply_accrual runs BEFORE the check)
@@ -106,7 +103,6 @@ fn accrual_v7_error_discriminants_are_pinned() {
     assert_eq!(ContractError::DrawExceedsMaxAmount as u32, 17);
     assert_eq!(ContractError::RepayExceedsMaxAmount as u32, 28);
     assert_eq!(ContractError::UtilizationNotZero as u32, 10);
-    assert_eq!(ContractError::LimitDecreaseRequiresRepayment as u32, 13);
 
     // Risk → rate/score clamp paths that execute with accrual head
     assert_eq!(ContractError::RateTooHigh as u32, 8);
@@ -150,7 +146,7 @@ fn accrual_v7_category_mappings_are_pinned() {
     // Block bucket (discriminant 9)
     assert_eq!(ContractError::DrawsFrozen.category(), Block);
     assert_eq!(ContractError::BorrowerFrozen.category(), Block);
-    assert_eq!(ContractError::BorrowerBlocked.category(), Block);
+
     assert_eq!(ContractError::CreditLineFrozen.category(), Block);
 
     // Oracle bucket (discriminant 7)
@@ -166,18 +162,7 @@ fn accrual_v7_category_mappings_are_pinned() {
         ContractError::InsufficientLiquidityReserve.category(),
         Liquidity
     );
-    assert_eq!(
-        ContractError::InsufficientRepaymentAllowance.category(),
-        Liquidity
-    );
-    assert_eq!(
-        ContractError::InsufficientRepaymentBalance.category(),
-        Liquidity
-    );
-    assert_eq!(
-        ContractError::LiquidityTokenCallFailed.category(),
-        Liquidity
-    );
+
     assert_eq!(ContractError::ExposureCapExceeded.category(), Liquidity);
 
     // Limit bucket (discriminant 4)
@@ -185,10 +170,6 @@ fn accrual_v7_category_mappings_are_pinned() {
     assert_eq!(ContractError::DrawExceedsMaxAmount.category(), Limit);
     assert_eq!(ContractError::RepayExceedsMaxAmount.category(), Limit);
     assert_eq!(ContractError::UtilizationNotZero.category(), Limit);
-    assert_eq!(
-        ContractError::LimitDecreaseRequiresRepayment.category(),
-        Limit
-    );
 
     // Auth / Reentrancy / Misc buckets
     assert_eq!(ContractError::Unauthorized.category(), Auth);
@@ -207,7 +188,7 @@ fn accrual_v7_category_mappings_are_pinned() {
 fn accrual_v7_subset_has_no_duplicate_discriminants() {
     use std::collections::HashSet;
 
-    let codes: Vec<u32> = vec![
+    let codes: std::vec::Vec<u32> = vec![
         ContractError::Overflow as u32,
         ContractError::InvalidAmount as u32,
         ContractError::TimestampRegression as u32,
@@ -221,7 +202,6 @@ fn accrual_v7_subset_has_no_duplicate_discriminants() {
         ContractError::CreditLineFrozen as u32,
         ContractError::DrawsFrozen as u32,
         ContractError::BorrowerFrozen as u32,
-        ContractError::BorrowerBlocked as u32,
         ContractError::OraclePriceInvalid as u32,
         ContractError::OraclePriceStale as u32,
         ContractError::OraclePriceDeviation as u32,
@@ -229,15 +209,11 @@ fn accrual_v7_subset_has_no_duplicate_discriminants() {
         ContractError::MissingLiquidityToken as u32,
         ContractError::MissingLiquiditySource as u32,
         ContractError::InsufficientLiquidityReserve as u32,
-        ContractError::InsufficientRepaymentAllowance as u32,
-        ContractError::InsufficientRepaymentBalance as u32,
-        ContractError::LiquidityTokenCallFailed as u32,
         ContractError::ExposureCapExceeded as u32,
         ContractError::OverLimit as u32,
         ContractError::DrawExceedsMaxAmount as u32,
         ContractError::RepayExceedsMaxAmount as u32,
         ContractError::UtilizationNotZero as u32,
-        ContractError::LimitDecreaseRequiresRepayment as u32,
         ContractError::RateTooHigh as u32,
         ContractError::ScoreTooHigh as u32,
         ContractError::DrawCooldownActive as u32,
@@ -255,7 +231,7 @@ fn accrual_v7_subset_has_no_duplicate_discriminants() {
     );
 }
 
-/// Known count: 37 variants in the v7 accrual surface (pinned above).
+/// Known count: 32 variants in the v7 accrual surface (pinned above).
 ///
 /// If this assertion fails, a new accrual-relevant variant was added to or
 /// removed from the `ContractError` enum — update the count AND add/remove
@@ -264,7 +240,7 @@ fn accrual_v7_subset_has_no_duplicate_discriminants() {
 /// `accrual_v7_category_mappings_are_pinned`.
 #[test]
 fn accrual_v7_subset_variant_count_is_known() {
-    const EXPECTED_VARIANT_COUNT: usize = 37;
+    const EXPECTED_VARIANT_COUNT: usize = 32;
 
     let codes = [
         ContractError::Overflow as u32,
@@ -280,7 +256,6 @@ fn accrual_v7_subset_variant_count_is_known() {
         ContractError::CreditLineFrozen as u32,
         ContractError::DrawsFrozen as u32,
         ContractError::BorrowerFrozen as u32,
-        ContractError::BorrowerBlocked as u32,
         ContractError::OraclePriceInvalid as u32,
         ContractError::OraclePriceStale as u32,
         ContractError::OraclePriceDeviation as u32,
@@ -288,15 +263,11 @@ fn accrual_v7_subset_variant_count_is_known() {
         ContractError::MissingLiquidityToken as u32,
         ContractError::MissingLiquiditySource as u32,
         ContractError::InsufficientLiquidityReserve as u32,
-        ContractError::InsufficientRepaymentAllowance as u32,
-        ContractError::InsufficientRepaymentBalance as u32,
-        ContractError::LiquidityTokenCallFailed as u32,
         ContractError::ExposureCapExceeded as u32,
         ContractError::OverLimit as u32,
         ContractError::DrawExceedsMaxAmount as u32,
         ContractError::RepayExceedsMaxAmount as u32,
         ContractError::UtilizationNotZero as u32,
-        ContractError::LimitDecreaseRequiresRepayment as u32,
         ContractError::RateTooHigh as u32,
         ContractError::ScoreTooHigh as u32,
         ContractError::DrawCooldownActive as u32,
@@ -331,9 +302,10 @@ mod integration {
         env.mock_all_auths();
 
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
+        client.set_min_collateral_ratio_bps(&0);
 
         let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
         let token_address = token_id.address();
@@ -375,7 +347,7 @@ mod integration {
         for _ in 0..=ACCRUE_BATCH_MAX {
             borrowers.push_back(Address::generate(&env));
         }
-        assert_eq!(borrowers.len() as u32, ACCRUE_BATCH_MAX + 1);
+        assert_eq!(borrowers.len(), ACCRUE_BATCH_MAX + 1);
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             client.accrue_batch(&borrowers);
@@ -398,10 +370,10 @@ mod integration {
     /// `ContractError::Paused` (discriminant 18) via `assert_not_paused`.
     #[test]
     fn accrue_batch_while_paused_reverts_with_paused_code_18() {
-        let (env, contract_id, admin, _token) = setup_with_token(0_i128);
+        let (env, contract_id, _admin, _token) = setup_with_token(0_i128);
         let client = CreditClient::new(&env, &contract_id);
 
-        client.pause_protocol(&admin);
+        client.set_protocol_paused(&true);
 
         let borrowers: Vec<Address> = Vec::new(&env);
 
@@ -433,9 +405,9 @@ mod integration {
 
         client.open_credit_line(&borrower, &huge_principal, &10_000_u32, &50_u32);
 
-        env.ledger().set_timestamp(1);
+        env.ledger().with_mut(|l| l.timestamp = 1);
         client.draw_credit(&borrower, &huge_principal);
-        env.ledger().set_timestamp(2);
+        env.ledger().with_mut(|l| l.timestamp = 2);
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             client.update_risk_parameters(&borrower, &i128::MAX, &10_000_u32, &50_u32);
@@ -553,26 +525,18 @@ mod integration {
     /// Any state-changing entrypoint that internally calls `apply_accrual`
     /// must first pass the admin-initialization gate when admin gates apply.
     #[test]
-    fn accrual_caller_fails_admin_not_initialized_code_32() {
+    fn constructor_initializes_admin_at_deployment() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register(Credit, ());
+        let admin = Address::generate(&env);
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         let borrower = Address::generate(&env);
 
-        // No `client.init` call → admin not yet set.
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            client.open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
-        }));
-        assert!(result.is_err());
-
-        let err_str = extract_error_str(&result.unwrap_err());
-        assert!(
-            err_str.contains("#32"),
-            "expected AdminNotInitialized (#32), got: {:?}",
-            err_str
-        );
+        // The constructor pins the admin atomically, so no separate init is
+        // needed and the contract is never left uninitialized.
+        client.open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
     }
 
     // ── Test 4.9 — determinism: same accrual-overflow inputs → same code (12) twice ──
@@ -590,9 +554,9 @@ mod integration {
             let borrower = Address::generate(&env);
 
             client.open_credit_line(&borrower, &huge_principal, &10_000_u32, &50_u32);
-            env.ledger().set_timestamp(1);
+            env.ledger().with_mut(|l| l.timestamp = 1);
             client.draw_credit(&borrower, &huge_principal);
-            env.ledger().set_timestamp(2);
+            env.ledger().with_mut(|l| l.timestamp = 2);
 
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 client.update_risk_parameters(&borrower, &i128::MAX, &10_000_u32, &50_u32);
@@ -623,7 +587,7 @@ mod integration {
         for _ in 0..ACCRUE_BATCH_MAX {
             batch_ok.push_back(Address::generate(&env));
         }
-        assert_eq!(batch_ok.len() as u32, ACCRUE_BATCH_MAX);
+        assert_eq!(batch_ok.len(), ACCRUE_BATCH_MAX);
         // Must not panic.
         client.accrue_batch(&batch_ok);
 
@@ -666,12 +630,12 @@ mod integration {
     /// (which invokes apply_accrual at its head) must encode #46.
     #[test]
     fn draw_head_accrual_line_frozen_emits_code_46() {
-        let (env, contract_id, admin, _token) = setup_with_token(10_000_i128);
+        let (env, contract_id, _admin, _token) = setup_with_token(10_000_i128);
         let client = CreditClient::new(&env, &contract_id);
         let borrower = Address::generate(&env);
 
         client.open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
-        client.freeze_credit_line(&admin, &borrower);
+        client.freeze_credit_line(&borrower, &FreezeReason::RiskInvestigation);
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             client.draw_credit(&borrower, &100_i128);

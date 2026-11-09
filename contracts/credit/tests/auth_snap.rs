@@ -6,17 +6,17 @@ use soroban_sdk::{testutils::Address as _, Address, Env};
 fn setup() -> (Env, CreditClient<'static>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     // Generate deterministic addresses for snapshots
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    
-    let contract_id = env.register(Credit, ());
+
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
-    
+
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
-    
+
     // Clear the auths recorded during setup so we only snapshot the target invocation.
     // Wait, env doesn't have clear_auths(). We can just skip the first auth (open_credit_line).
     (env, client, admin, borrower)

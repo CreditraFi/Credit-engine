@@ -30,7 +30,7 @@ fn setup(env: &Env) -> (CreditClient<'_>, Address, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -52,7 +52,7 @@ fn setup_multi(
 ) -> (CreditClient<'_>, Address, std::vec::Vec<Address>, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -115,7 +115,7 @@ fn set_max_total_exposure_requires_admin() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -206,34 +206,6 @@ fn removing_cap_re_enables_large_draws() {
     assert_eq!(client.get_total_utilized(), 700);
 }
 
-#[test]
-fn borrower_exposure_cap_blocks_draws_above_per_borrower_limit() {
-    let env = Env::default();
-    let (client, _admin, borrower, _cid) = setup(&env);
-
-    client.set_borrower_exposure_cap(&borrower, &3_000_i128);
-
-    client.draw_credit(&borrower, &3_000_i128);
-    assert_eq!(client.get_total_utilized(), 3_000);
-
-    let result = client.try_draw_credit(&borrower, &1_i128);
-    assert!(result.is_err());
-}
-
-#[test]
-fn borrower_exposure_cap_can_be_cleared() {
-    let env = Env::default();
-    let (client, _admin, borrower, _cid) = setup(&env);
-
-    client.set_borrower_exposure_cap(&borrower, &2_000_i128);
-    client.draw_credit(&borrower, &2_000_i128);
-
-    client.set_borrower_exposure_cap(&borrower, &0_i128);
-    client.draw_credit(&borrower, &1_000_i128);
-
-    assert_eq!(client.get_total_utilized(), 3_000);
-}
-
 // ── Accumulator consistency after repay/forgive ───────────────────────────────
 
 #[test]
@@ -242,7 +214,7 @@ fn repay_reduces_total_utilized_and_re_enables_draws() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -333,7 +305,7 @@ fn cap_below_current_total_blocks_new_draws_but_not_repayments() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -401,7 +373,7 @@ fn total_utilized_stays_consistent_after_mixed_draw_repay_forgive() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

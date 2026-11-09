@@ -34,7 +34,7 @@ fn setup_defaulted_line(utilized_amount: i128) -> (Env, Address, Address, Addres
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
 
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
@@ -352,7 +352,7 @@ fn settle_on_active_line_panics() {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);
@@ -395,7 +395,7 @@ fn settle_on_nonexistent_line_panics() {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);

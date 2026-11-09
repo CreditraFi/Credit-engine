@@ -4,11 +4,11 @@ use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{Address, Env};
 
-fn setup(env: &Env) -> (CreditClient, Address, Address) {
+fn setup(env: &Env) -> (CreditClient<'_>, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     // Initialize credit line
@@ -197,7 +197,7 @@ fn test_ceiling_independent_per_borrower() {
     let admin = Address::generate(&env);
     let borrower_a = Address::generate(&env);
     let borrower_b = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -278,7 +278,7 @@ fn test_ceiling_with_rate_change_limits() {
 
     // Current rate is 300, ceiling is 400
     // Try to jump to 500 (would be capped to 400, delta = 100)
-    env.ledger().set_timestamp(100);
+    env.ledger().with_mut(|l| l.timestamp = 100);
     client.update_risk_parameters(&borrower, &1_000_i128, &500_u32, &50_u32);
     assert_eq!(
         client.get_credit_line(&borrower).unwrap().interest_rate_bps,
@@ -286,7 +286,7 @@ fn test_ceiling_with_rate_change_limits() {
     );
 
     // Try to change again within interval (should fail due to rate change limits)
-    env.ledger().set_timestamp(150);
+    env.ledger().with_mut(|l| l.timestamp = 150);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         client.update_risk_parameters(&borrower, &1_000_i128, &350_u32, &50_u32);
     }));

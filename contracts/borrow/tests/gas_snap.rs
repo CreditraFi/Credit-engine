@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#![allow(dead_code)]
 
 //! Per-entrypoint gas snapshot tests for the borrow (v7) subsystem.
 //!
@@ -36,7 +37,7 @@
 
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::{
-    testutils::{budget::Budget, Address as _, Ledger},
+    testutils::{Address as _, Ledger},
     token::StellarAssetClient,
     Address, Env,
 };
@@ -49,7 +50,7 @@ const START_TS: u64 = 10_000;
 
 /// Reset the budget to unlimited, run `f`, return (cpu, mem).
 fn measure(env: &Env, f: impl FnOnce()) -> (u64, u64) {
-    let budget = env.cost_estimate().budget();
+    let mut budget = env.cost_estimate().budget();
     budget.reset_unlimited();
     f();
     (budget.cpu_instruction_cost(), budget.memory_bytes_cost())
@@ -71,7 +72,7 @@ fn setup(env: &Env) -> Fixture<'_> {
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -242,10 +243,7 @@ fn gas_set_utilization_cap() {
     });
 
     assert!(cpu > 0, "set_utilization_cap must consume CPU");
-    assert!(
-        cpu < 5_000_000,
-        "set_utilization_cap CPU regression: {cpu}"
-    );
+    assert!(cpu < 5_000_000, "set_utilization_cap CPU regression: {cpu}");
     assert!(
         mem < 500_000,
         "set_utilization_cap memory regression: {mem}"
@@ -301,10 +299,7 @@ fn gas_borrow_read_only_queries() {
         let _ = f.client.get_utilization_cap(&f.borrower);
     });
     assert!(cpu > 0, "get_utilization_cap must consume CPU");
-    assert!(
-        cpu < 2_000_000,
-        "get_utilization_cap CPU regression: {cpu}"
-    );
+    assert!(cpu < 2_000_000, "get_utilization_cap CPU regression: {cpu}");
     assert!(
         mem < 200_000,
         "get_utilization_cap memory regression: {mem}"

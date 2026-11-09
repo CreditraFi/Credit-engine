@@ -3,7 +3,7 @@
 //! Assert per-draw event count is bounded.
 //!
 //! A single `draw_credit` can emit accrual + drawn + penalty-rate-enter/exit
-//! + grace-waiver events. Indexers depend on an upper bound — this test
+//! and grace-waiver events. Indexers depend on an upper bound — this test
 //! locks the invariant `env.events().all().len() <= MAX_EVENTS_PER_DRAW`
 //! after every successful `draw_credit`, covering both the Active (non-
 //! delinquent) and Delinquent paths.
@@ -65,7 +65,7 @@ fn setup_active_borrower(start_ts: u64) -> (Env, Address, Address, Address) {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -175,7 +175,7 @@ fn active_draw_bound_is_two_when_no_delinquency() {
 
 /// Configure a repayment schedule so the borrower is already past the grace
 /// window, then enable penalty surcharge.
-fn make_delinquent(env: &Env, client: &CreditClient, borrower: &Address) {
+fn make_delinquent(_env: &Env, client: &CreditClient, borrower: &Address) {
     // Set a repayment schedule with next_due_ts in the past.
     // The is_delinquent check uses `ledger.timestamp() > next_due_ts + grace`.
     // With grace defaulting to 0 and no global config, setting next_due_ts

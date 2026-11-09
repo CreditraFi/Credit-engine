@@ -3,7 +3,10 @@
 //! as ledger time advances for active, suspended, and delinquent lines.
 
 use proptest::prelude::*;
-use soroban_sdk::{token, Address, Env, testutils::{Address as _, Ledger}};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    token, Address, Env,
+};
 
 use creditra_credit::{types::GraceWaiverMode, Credit, CreditClient};
 
@@ -11,7 +14,7 @@ fn deploy_credit_contract(env: &Env) -> (CreditClient<'_>, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -25,7 +28,7 @@ fn deploy_credit_contract(env: &Env) -> (CreditClient<'_>, Address) {
 
 fn setup_active_line(env: &Env) -> (CreditClient<'_>, Address) {
     let (client, borrower) = deploy_credit_contract(env);
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.open_credit_line(&borrower, &10_000_i128, &500_u32, &70_u32);
     client.draw_credit(&borrower, &1_000_i128);
     (client, borrower)
@@ -33,7 +36,7 @@ fn setup_active_line(env: &Env) -> (CreditClient<'_>, Address) {
 
 fn setup_suspended_line(env: &Env) -> (CreditClient<'_>, Address) {
     let (client, borrower) = deploy_credit_contract(env);
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.open_credit_line(&borrower, &10_000_i128, &500_u32, &70_u32);
     client.draw_credit(&borrower, &1_000_i128);
     client.suspend_credit_line(&borrower);
@@ -43,7 +46,7 @@ fn setup_suspended_line(env: &Env) -> (CreditClient<'_>, Address) {
 
 fn setup_delinquent_line(env: &Env) -> (CreditClient<'_>, Address) {
     let (client, borrower) = deploy_credit_contract(env);
-    env.ledger().set_timestamp(1);
+    env.ledger().with_mut(|l| l.timestamp = 1);
     client.open_credit_line(&borrower, &10_000_i128, &500_u32, &70_u32);
     client.draw_credit(&borrower, &1_000_i128);
     client.set_penalty_surcharge_bps(&500_u32);
@@ -52,7 +55,7 @@ fn setup_delinquent_line(env: &Env) -> (CreditClient<'_>, Address) {
 }
 
 fn accrue_via_update_risk(client: &CreditClient<'_>, borrower: &Address) {
-    client.update_risk_parameters(&borrower, &10_000_i128, &500_u32, &70_u32);
+    client.update_risk_parameters(borrower, &10_000_i128, &500_u32, &70_u32);
 }
 
 proptest! {
@@ -67,11 +70,11 @@ proptest! {
         let env = Env::default();
         let (client, borrower) = setup_active_line(&env);
 
-        env.ledger().set_timestamp(t1);
+        env.ledger().with_mut(|l| l.timestamp = t1);
         accrue_via_update_risk(&client, &borrower);
         let before = client.get_credit_line(&borrower).unwrap();
 
-        env.ledger().set_timestamp(t2);
+        env.ledger().with_mut(|l| l.timestamp = t2);
         accrue_via_update_risk(&client, &borrower);
         let after = client.get_credit_line(&borrower).unwrap();
 
@@ -94,11 +97,11 @@ proptest! {
         let env = Env::default();
         let (client, borrower) = setup_suspended_line(&env);
 
-        env.ledger().set_timestamp(t1);
+        env.ledger().with_mut(|l| l.timestamp = t1);
         accrue_via_update_risk(&client, &borrower);
         let before = client.get_credit_line(&borrower).unwrap();
 
-        env.ledger().set_timestamp(t2);
+        env.ledger().with_mut(|l| l.timestamp = t2);
         accrue_via_update_risk(&client, &borrower);
         let after = client.get_credit_line(&borrower).unwrap();
 
@@ -121,11 +124,11 @@ proptest! {
         let env = Env::default();
         let (client, borrower) = setup_delinquent_line(&env);
 
-        env.ledger().set_timestamp(t1);
+        env.ledger().with_mut(|l| l.timestamp = t1);
         accrue_via_update_risk(&client, &borrower);
         let before = client.get_credit_line(&borrower).unwrap();
 
-        env.ledger().set_timestamp(t2);
+        env.ledger().with_mut(|l| l.timestamp = t2);
         accrue_via_update_risk(&client, &borrower);
         let after = client.get_credit_line(&borrower).unwrap();
 
@@ -147,11 +150,11 @@ fn accrual_monotonicity_suspended_crosses_grace_boundary() {
 
     // Inside grace window, interest is waived. After grace_end, interest resumes.
     let grace_end = 1 + 31_536_000_u64;
-    env.ledger().set_timestamp(15_768_000_u64); // inside grace window
+    env.ledger().with_mut(|l| l.timestamp = 15_768_000_u64); // inside grace window
     accrue_via_update_risk(&client, &borrower);
     let before = client.get_credit_line(&borrower).unwrap();
 
-    env.ledger().set_timestamp(grace_end + 1);
+    env.ledger().with_mut(|l| l.timestamp = grace_end + 1);
     accrue_via_update_risk(&client, &borrower);
     let after = client.get_credit_line(&borrower).unwrap();
 

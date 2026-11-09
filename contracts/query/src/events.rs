@@ -130,10 +130,8 @@ pub struct ProtocolSummaryQueriedEvent {
 /// `("query", "cl_read")` — emitted once per `get_credit_line` call that
 /// opts in to on-chain observability.
 pub fn publish_credit_line_queried(env: &Env, event: CreditLineQueriedEvent) {
-    env.events().publish(
-        (symbol_short!("query"), symbol_short!("cl_read")),
-        event,
-    );
+    env.events()
+        .publish((symbol_short!("query"), symbol_short!("cl_read")), event);
 }
 
 /// Publish a health-factor-queried event.
@@ -142,10 +140,8 @@ pub fn publish_credit_line_queried(env: &Env, event: CreditLineQueriedEvent) {
 /// `("query", "hf_read")` — emitted once per `get_health_factor` call that
 /// opts in to on-chain observability.
 pub fn publish_health_factor_queried(env: &Env, event: HealthFactorQueriedEvent) {
-    env.events().publish(
-        (symbol_short!("query"), symbol_short!("hf_read")),
-        event,
-    );
+    env.events()
+        .publish((symbol_short!("query"), symbol_short!("hf_read")), event);
 }
 
 /// Publish a delinquency-checked event.
@@ -154,10 +150,8 @@ pub fn publish_health_factor_queried(env: &Env, event: HealthFactorQueriedEvent)
 /// `("query", "dlq_chk")` — emitted once per `is_delinquent` call that
 /// opts in to on-chain observability.
 pub fn publish_delinquency_checked(env: &Env, event: DelinquencyCheckedEvent) {
-    env.events().publish(
-        (symbol_short!("query"), symbol_short!("dlq_chk")),
-        event,
-    );
+    env.events()
+        .publish((symbol_short!("query"), symbol_short!("dlq_chk")), event);
 }
 
 /// Publish a protocol-summary-queried event.
@@ -166,8 +160,6 @@ pub fn publish_delinquency_checked(env: &Env, event: DelinquencyCheckedEvent) {
 /// `("query", "proto_rd")` — emitted once per `get_protocol_summary` call
 /// that opts in to on-chain observability.
 pub fn publish_protocol_summary_queried(env: &Env, event: ProtocolSummaryQueriedEvent) {
-    env.events().publish(
-        (symbol_short!("query"), symbol_short!("proto_rd")),
-        event,
-    );
+    env.events()
+        .publish((symbol_short!("query"), symbol_short!("proto_rd")), event);
 }

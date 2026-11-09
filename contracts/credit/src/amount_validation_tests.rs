@@ -47,7 +47,7 @@ fn setup_with_token(
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -68,7 +68,7 @@ fn setup_with_token(
 fn setup_admin_only(env: &Env) -> (CreditClient<'_>, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     (client, admin)

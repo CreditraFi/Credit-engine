@@ -3,12 +3,12 @@
 use creditra_credit::{Credit, CreditClient};
 use soroban_sdk::{testutils::Address as _, token::StellarAssetClient, Address, Env};
 
-fn setup(env: &Env) -> (CreditClient, Address, Address, Address) {
+fn setup(env: &Env) -> (CreditClient<'_>, Address, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
 
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     client.set_min_collateral_ratio_bps(&15000);
@@ -100,7 +100,7 @@ fn test_deposit_without_collateral_token_fails() {
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
 
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     // No liquidity token set → deposit should fail with MissingLiquidityToken.
@@ -115,7 +115,7 @@ fn test_withdraw_without_collateral_token_fails() {
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
 
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     // Set collateral balance directly so amount <= cur_balance check passes before MissingLiquidityToken check
@@ -162,4 +162,3 @@ fn test_withdraw_exact_collateral_balance_succeeds() {
     client.withdraw_collateral(&borrower, &1000);
     assert_eq!(client.get_collateral(&borrower), 0);
 }
-

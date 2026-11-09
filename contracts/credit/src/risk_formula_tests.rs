@@ -240,7 +240,7 @@ fn formula_disabled_by_default() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     assert!(client.get_rate_formula_config().is_none());
@@ -251,7 +251,7 @@ fn set_and_get_rate_formula_config() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -269,7 +269,7 @@ fn clear_rate_formula_config_removes_it() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -286,7 +286,7 @@ fn update_risk_uses_formula_when_enabled() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &300_u32, &50_u32);
@@ -309,7 +309,7 @@ fn update_risk_uses_manual_rate_when_disabled() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &300_u32, &50_u32);
@@ -326,7 +326,7 @@ fn formula_clamps_to_min_for_low_score() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &500_u32, &0_u32);
@@ -347,7 +347,7 @@ fn formula_clamps_to_max_for_high_score() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &300_u32, &50_u32);
@@ -368,7 +368,7 @@ fn clearing_formula_restores_manual_mode() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &300_u32, &50_u32);
@@ -398,7 +398,7 @@ fn set_config_min_greater_than_max_reverts() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.set_rate_formula_config(&200_u32, &50_u32, &5000_u32, &100_u32);
@@ -410,7 +410,7 @@ fn set_config_max_exceeds_cap_reverts() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.set_rate_formula_config(&200_u32, &50_u32, &100_u32, &10_001_u32);
@@ -422,7 +422,7 @@ fn set_config_base_exceeds_cap_reverts() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.set_rate_formula_config(&10_001_u32, &50_u32, &100_u32, &5000_u32);
@@ -435,7 +435,7 @@ fn set_config_base_exceeds_cap_reverts() {
 fn set_config_requires_admin() {
     let env = Env::default();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.set_rate_formula_config(&200_u32, &50_u32, &100_u32, &5000_u32);
@@ -446,7 +446,7 @@ fn set_config_requires_admin() {
 fn clear_config_requires_admin() {
     let env = Env::default();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.clear_rate_formula_config();
@@ -460,7 +460,7 @@ fn formula_with_all_boundary_scores() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &300_u32, &0_u32);
@@ -496,7 +496,7 @@ fn existing_lines_unaffected_until_update() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &10_000_i128, &300_u32, &50_u32);
@@ -516,7 +516,7 @@ fn formula_update_respects_rate_change_limits() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -540,7 +540,7 @@ fn formula_update_within_rate_change_limits_succeeds() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 

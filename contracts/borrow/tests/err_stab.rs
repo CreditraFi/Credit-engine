@@ -21,7 +21,7 @@
 //!   `CreditLineFrozen` (46), `UtilizationNotZero` (10).
 //! - **Freeze / block** — `DrawsFrozen` (19), `BorrowerFrozen` (40),
 //!   `BorrowerBlocked` (16), `Paused` (18), `DrawCooldownActive` (29),
-//!   `AdminCooldownActive` (54).
+//!   `RiskAdminCooldownActive` (54).
 //! - **Liquidity / repay funds** — `MissingLiquidityToken` (22),
 //!   `MissingLiquiditySource` (23), `InsufficientLiquidityReserve` (24),
 //!   `LiquidityTokenCallFailed` (25), `InsufficientRepaymentAllowance` (26),
@@ -87,20 +87,16 @@ fn borrow_v7_error_discriminants_are_pinned() {
     assert_eq!(ContractError::ExposureCapExceeded as u32, 31);
 
     // Freeze / block / pause / cooldown
-    assert_eq!(ContractError::BorrowerBlocked as u32, 16);
     assert_eq!(ContractError::Paused as u32, 18);
     assert_eq!(ContractError::DrawsFrozen as u32, 19);
     assert_eq!(ContractError::DrawCooldownActive as u32, 29);
     assert_eq!(ContractError::BorrowerFrozen as u32, 40);
-    assert_eq!(ContractError::AdminCooldownActive as u32, 54);
+    assert_eq!(ContractError::RiskAdminCooldownActive as u32, 54);
 
     // Liquidity / repayment funding
     assert_eq!(ContractError::MissingLiquidityToken as u32, 22);
     assert_eq!(ContractError::MissingLiquiditySource as u32, 23);
     assert_eq!(ContractError::InsufficientLiquidityReserve as u32, 24);
-    assert_eq!(ContractError::LiquidityTokenCallFailed as u32, 25);
-    assert_eq!(ContractError::InsufficientRepaymentAllowance as u32, 26);
-    assert_eq!(ContractError::InsufficientRepaymentBalance as u32, 27);
 
     // Collateral gate
     assert_eq!(ContractError::CollateralRatioBelowMinimum as u32, 35);
@@ -138,20 +134,25 @@ fn borrow_v7_category_mappings_are_pinned() {
 
     assert_eq!(ContractError::MissingLiquidityToken.category(), Liquidity);
     assert_eq!(ContractError::MissingLiquiditySource.category(), Liquidity);
-    assert_eq!(ContractError::InsufficientLiquidityReserve.category(), Liquidity);
-    assert_eq!(ContractError::LiquidityTokenCallFailed.category(), Liquidity);
-    assert_eq!(ContractError::InsufficientRepaymentAllowance.category(), Liquidity);
-    assert_eq!(ContractError::InsufficientRepaymentBalance.category(), Liquidity);
+    assert_eq!(
+        ContractError::InsufficientLiquidityReserve.category(),
+        Liquidity
+    );
     assert_eq!(ContractError::ExposureCapExceeded.category(), Liquidity);
 
     assert_eq!(ContractError::Paused.category(), Risk);
     assert_eq!(ContractError::DrawCooldownActive.category(), Risk);
-    assert_eq!(ContractError::AdminCooldownActive.category(), Risk);
+    assert_eq!(ContractError::RiskAdminCooldownActive.category(), Risk);
 
-    assert_eq!(ContractError::CollateralRatioBelowMinimum.category(), Collateral);
-    assert_eq!(ContractError::InsufficientCollateralBalance.category(), Collateral);
+    assert_eq!(
+        ContractError::CollateralRatioBelowMinimum.category(),
+        Collateral
+    );
+    assert_eq!(
+        ContractError::InsufficientCollateralBalance.category(),
+        Collateral
+    );
 
-    assert_eq!(ContractError::BorrowerBlocked.category(), Block);
     assert_eq!(ContractError::DrawsFrozen.category(), Block);
     assert_eq!(ContractError::BorrowerFrozen.category(), Block);
     assert_eq!(ContractError::CreditLineFrozen.category(), Block);
@@ -187,18 +188,14 @@ fn borrow_v7_subset_has_no_duplicate_discriminants() {
         ContractError::DrawExceedsMaxAmount as u32,
         ContractError::RepayExceedsMaxAmount as u32,
         ContractError::ExposureCapExceeded as u32,
-        ContractError::BorrowerBlocked as u32,
         ContractError::Paused as u32,
         ContractError::DrawsFrozen as u32,
         ContractError::DrawCooldownActive as u32,
         ContractError::BorrowerFrozen as u32,
-        ContractError::AdminCooldownActive as u32,
+        ContractError::RiskAdminCooldownActive as u32,
         ContractError::MissingLiquidityToken as u32,
         ContractError::MissingLiquiditySource as u32,
         ContractError::InsufficientLiquidityReserve as u32,
-        ContractError::LiquidityTokenCallFailed as u32,
-        ContractError::InsufficientRepaymentAllowance as u32,
-        ContractError::InsufficientRepaymentBalance as u32,
         ContractError::CollateralRatioBelowMinimum as u32,
         ContractError::InsufficientCollateralBalance as u32,
         ContractError::DrawReversalWindowExpired as u32,
@@ -222,7 +219,7 @@ fn borrow_v7_subset_has_no_duplicate_discriminants() {
 /// `borrow_v7_category_mappings_are_pinned`.
 #[test]
 fn borrow_v7_subset_variant_count_is_known() {
-    const EXPECTED_VARIANT_COUNT: usize = 31;
+    const EXPECTED_VARIANT_COUNT: usize = 26;
 
     let codes = [
         ContractError::Unauthorized as u32,
@@ -240,18 +237,14 @@ fn borrow_v7_subset_variant_count_is_known() {
         ContractError::DrawExceedsMaxAmount as u32,
         ContractError::RepayExceedsMaxAmount as u32,
         ContractError::ExposureCapExceeded as u32,
-        ContractError::BorrowerBlocked as u32,
         ContractError::Paused as u32,
         ContractError::DrawsFrozen as u32,
         ContractError::DrawCooldownActive as u32,
         ContractError::BorrowerFrozen as u32,
-        ContractError::AdminCooldownActive as u32,
+        ContractError::RiskAdminCooldownActive as u32,
         ContractError::MissingLiquidityToken as u32,
         ContractError::MissingLiquiditySource as u32,
         ContractError::InsufficientLiquidityReserve as u32,
-        ContractError::LiquidityTokenCallFailed as u32,
-        ContractError::InsufficientRepaymentAllowance as u32,
-        ContractError::InsufficientRepaymentBalance as u32,
         ContractError::CollateralRatioBelowMinimum as u32,
         ContractError::InsufficientCollateralBalance as u32,
         ContractError::DrawReversalWindowExpired as u32,
@@ -279,7 +272,7 @@ mod integration {
         env.ledger().with_mut(|li| li.timestamp = 10_000);
 
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
 
@@ -347,7 +340,7 @@ mod integration {
         let client = CreditClient::new(&env, &contract_id);
         let borrower = Address::generate(&env);
         client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
-        client.freeze_draws();
+        client.freeze_draws(&creditra_credit::FreezeReason::LiquidityReserve);
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             client.draw_credit(&borrower, &100_i128);

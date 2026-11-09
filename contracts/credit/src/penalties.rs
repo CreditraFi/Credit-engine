@@ -154,6 +154,7 @@ pub enum LateFeeConfig {
 /// let fee = compute_late_fee(LateFeeConfig::AprBased(AprFeeConfig { surcharge_bps: 200 }), 3)?;
 /// assert_eq!(fee, 0); // accrual handles APR surcharge separately
 /// ```
+#[allow(dead_code)]
 pub fn compute_late_fee(
     config: LateFeeConfig,
     missed_installments: u64,
@@ -170,7 +171,7 @@ pub fn compute_late_fee(
             if amount == 0 {
                 return Ok(0);
             }
-            let count = i128::try_from(missed_installments).map_err(|_| ContractError::Overflow)?;
+            let count = i128::from(missed_installments);
             amount.checked_mul(count).ok_or(ContractError::Overflow)
         }
         LateFeeConfig::AprBased(_) => {

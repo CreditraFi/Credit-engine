@@ -12,7 +12,7 @@ fn setup() -> (Env, Address, Address, Address, Address, Address) {
     let borrower = Address::generate(&env);
     let reserve = Address::generate(&env);
     let treasury = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -26,6 +26,7 @@ fn setup() -> (Env, Address, Address, Address, Address, Address) {
     (env, contract_id, token_address, borrower, reserve, treasury)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prepare_repay<'a>(
     env: &'a Env,
     contract_id: &'a Address,
@@ -43,10 +44,6 @@ fn prepare_repay<'a>(
     asset.mint(contract_id, &draw_amount);
     client.draw_credit(borrower, &draw_amount);
 
-    // Widen bounds to accommodate the requested fee_bps
-    if fee_bps > 1000 {
-        client.set_protocol_fee_bounds(&0_u32, &fee_bps);
-    }
     client.set_protocol_fee_bps(&fee_bps);
 
     env.ledger()

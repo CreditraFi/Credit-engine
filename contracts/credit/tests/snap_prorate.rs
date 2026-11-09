@@ -321,7 +321,7 @@ fn prorate_interest_boundary_snapshots() {
 fn prorate_interest_fuzz_snapshots() {
     let mut runner = TestRunner::deterministic();
     runner
-        .run(&prorate_test_case_strategy(), |test_case| {
+        .run(&prorate_test_case_strategy(), |_test_case| {
             // We don't assert anything here; we just collect the cases
             // The snapshot will capture the results
             Ok(())

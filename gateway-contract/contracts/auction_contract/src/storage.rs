@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Auction storage helpers and TTL primitives.
 //!
 //! # What

@@ -9,10 +9,7 @@
 
 use creditra_credit::types::{ContractError, ContractErrorCategory};
 use creditra_credit::{Credit, CreditClient};
-use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    token, Address, Env, Vec,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 #[test]
 fn query_v7_error_discriminants_are_pinned() {
@@ -27,7 +24,6 @@ fn query_v7_error_discriminants_are_pinned() {
     assert_eq!(ContractError::AdminNotInitialized as u32, 32);
     assert_eq!(ContractError::InvalidAmount as u32, 5);
     assert_eq!(ContractError::Paused as u32, 18);
-    assert_eq!(ContractError::BorrowerBlocked as u32, 16);
     assert_eq!(ContractError::BorrowerFrozen as u32, 40);
     assert_eq!(ContractError::DrawsFrozen as u32, 19);
     assert_eq!(ContractError::MissingLiquidityToken as u32, 22);
@@ -46,10 +42,12 @@ fn query_v7_category_mappings_are_pinned() {
     assert_eq!(ContractError::CreditLineNotFound.category(), Misc);
     assert_eq!(ContractError::CreditLineClosed.category(), Lifecycle);
     assert_eq!(ContractError::Paused.category(), Risk);
-    assert_eq!(ContractError::BorrowerBlocked.category(), Block);
     assert_eq!(ContractError::CreditLineFrozen.category(), Block);
     assert_eq!(ContractError::ExposureCapExceeded.category(), Liquidity);
-    assert_eq!(ContractError::CollateralRatioBelowMinimum.category(), Collateral);
+    assert_eq!(
+        ContractError::CollateralRatioBelowMinimum.category(),
+        Collateral
+    );
     assert_eq!(ContractError::Reentrancy.category(), Reentrancy);
     assert_eq!(ContractError::OraclePriceInvalid.category(), Oracle);
 }
@@ -59,7 +57,7 @@ fn paginated_over_limit_reverts_with_overflow_code_12() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));

@@ -51,7 +51,7 @@ use soroban_sdk::{Address, Env, IntoVal, Symbol};
 fn setup(env: &Env) -> (CreditClient<'_>, Address, Address, Address) {
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_i128, &300_u32, &50_u32);
@@ -364,7 +364,7 @@ fn draw_credit_wrong_signer() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -395,7 +395,7 @@ fn repay_credit_wrong_signer() {
     env.mock_all_auths();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
 
@@ -542,4 +542,3 @@ fn set_protocol_paused_non_admin_mock_auth() {
         }])
         .set_protocol_paused(&true);
 }
-

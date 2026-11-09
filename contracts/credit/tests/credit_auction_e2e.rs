@@ -40,11 +40,11 @@ struct AuctionSettlementEvent {
 
 fn setup_defaulted_credit(env: &Env, draw_amount: i128) -> Deployment {
     env.mock_all_auths_allowing_non_root_auth();
-    env.ledger().set_timestamp(START_TS);
+    env.ledger().with_mut(|l| l.timestamp = START_TS);
 
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let credit_id = env.register(Credit, ());
+    let credit_id = env.register(Credit, (admin.clone(),));
     let auction_id = env.register(Auction, ());
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(env));
     let token_address = token_id.address();
@@ -108,7 +108,7 @@ fn run_auction_to_settlement(
     auction.place_bid(settlement_id, &bidder, &first_bid);
     auction.place_bid(settlement_id, &winner, &recovered_amount);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
 
     auction.close_auction(settlement_id);
     auction.settle_default_liquidation(settlement_id, &deployment.credit_id, &deployment.borrower);
@@ -247,7 +247,7 @@ fn e2e_atomic_settlement_with_configured_auction() {
     let winner = Address::generate(&env);
     auction.place_bid(&settlement_id, &winner, &recovered_amount);
 
-    env.ledger().set_timestamp(end_time);
+    env.ledger().with_mut(|l| l.timestamp = end_time);
 
     auction.close_auction(&settlement_id);
 

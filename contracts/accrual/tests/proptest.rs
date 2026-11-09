@@ -42,7 +42,7 @@ use creditra_credit::{Credit, CreditClient};
 use proptest::prelude::*;
 use proptest::test_runner::Config as ProptestConfig;
 use soroban_sdk::testutils::{Address as _, Ledger};
-use soroban_sdk::token::StellarAssetClient;
+use soroban_sdk::token::{self, StellarAssetClient};
 use soroban_sdk::{Address, Env, Vec};
 
 const BORROWER_COUNT: usize = 3;
@@ -53,12 +53,13 @@ const LIQUIDITY_AMOUNT: i128 = 10_000_000;
 fn setup_env() -> (Env, CreditClient<'static>, std::vec::Vec<Address>) {
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().set_timestamp(INITIAL_TIMESTAMP);
+    env.ledger().with_mut(|l| l.timestamp = INITIAL_TIMESTAMP);
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
+    client.set_min_collateral_ratio_bps(&0);
 
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
     let token = token_id.address();
@@ -76,6 +77,12 @@ fn setup_env() -> (Env, CreditClient<'static>, std::vec::Vec<Address>) {
         let rate_bps = 1_000_u32 + (i as u32 * 500_u32);
         let score = 30_u32 + (i as u32 * 10_u32);
         client.open_credit_line(&borrower, &credit_limit, &rate_bps, &score);
+        token::Client::new(&env, &token).approve(
+            &borrower,
+            &contract_id,
+            &i128::MAX,
+            &6_000_000_u32,
+        );
         borrowers.push(borrower);
     }
 
@@ -84,14 +91,14 @@ fn setup_env() -> (Env, CreditClient<'static>, std::vec::Vec<Address>) {
 
 /// Assert `0 <= accrued_interest <= utilized_amount` for every active line.
 fn assert_accrued_le_utilized(client: &CreditClient<'_>, label: &str) {
-    let mut cursor = None;
+    let mut cursor: Option<u32> = None;
     loop {
         let page = client.enumerate_credit_lines(&cursor, &8);
         if page.is_empty() {
             break;
         }
         for item in page.iter() {
-            let (_, line) = item;
+            let (id, line) = item;
             assert!(
                 line.accrued_interest >= 0,
                 "{label}: accrued_interest is negative ({}) for borrower {:?}",
@@ -105,13 +112,14 @@ fn assert_accrued_le_utilized(client: &CreditClient<'_>, label: &str) {
                 line.utilized_amount,
                 line.borrower,
             );
+            cursor = Some(id);
         }
     }
 }
 
 /// Assert `total_utilized` >= 0 (sanity check).
 fn assert_total_utilized_non_negative(client: &CreditClient<'_>, label: &str) {
-    let total = client.total_utilized();
+    let total = client.get_total_utilized();
     assert!(total >= 0, "{label}: total_utilized is negative: {total}");
 }
 
@@ -277,10 +285,10 @@ proptest! {
         client_a.accrue_batch(&batch);
 
         // Env B: individual update_risk_parameters (triggers apply_accrual).
-        for i in 0..BORROWER_COUNT {
-            let line = client_b.get_credit_line(&borrowers_b[i]).unwrap();
+        for borrower in borrowers_b.iter() {
+            let line = client_b.get_credit_line(borrower).unwrap();
             let _ = client_b.try_update_risk_parameters(
-                &borrowers_b[i],
+                borrower,
                 &line.credit_limit,
                 &line.interest_rate_bps,
                 &line.risk_score,
@@ -331,8 +339,8 @@ fn max_rate_one_year_bound() {
     let (env, client, borrowers) = setup_env();
     let borrower = &borrowers[0];
 
-    // Reopen with max rate (100% APR).
-    client.open_credit_line(borrower, &1_000_000_i128, &10_000_u32, &50_u32);
+    // Move to max rate (100% APR) before drawing.
+    client.update_risk_parameters(borrower, &1_000_000_i128, &10_000_u32, &50_u32);
     client.draw_credit(borrower, &100_000_i128);
 
     env.ledger().with_mut(|l| l.timestamp += 31_536_000);

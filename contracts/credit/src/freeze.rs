@@ -27,7 +27,6 @@
 //! This is mitigated by the same admin-key security requirements that protect
 //! all other admin operations. Freeze reasons are emitted on-chain for audit.
 
-use crate::auth::require_admin_auth;
 use crate::events::{publish_credit_line_freeze_event, publish_draws_frozen_event};
 use crate::storage::{
     enforce_freeze_cooldown, get_credit_line, record_freeze_timestamp_if_cooldown, DataKey,
@@ -55,7 +54,6 @@ use soroban_sdk::{Address, Env};
 /// # Errors
 /// - Panics with auth error if the caller is not the configured admin.
 pub fn freeze_draws(env: Env, reason: FreezeReason) {
-    require_admin_auth(&env);
     enforce_freeze_cooldown(&env);
     env.storage().instance().set(
         &DataKey::DrawsFrozen,
@@ -89,7 +87,6 @@ pub fn freeze_draws(env: Env, reason: FreezeReason) {
 /// # Errors
 /// - Panics with auth error if the caller is not the configured admin.
 pub fn unfreeze_draws(env: Env) {
-    require_admin_auth(&env);
     enforce_freeze_cooldown(&env);
     let reason = get_draws_freeze_state(&env)
         .map(|state| state.reason)
@@ -120,7 +117,7 @@ pub fn unfreeze_draws(env: Env) {
 /// - `true` if draws are frozen
 /// - `false` if draws are not frozen or the key has never been set
 pub fn is_draws_frozen(env: &Env) -> bool {
-    get_draws_freeze_state(env).map_or(false, |state| state.frozen)
+    get_draws_freeze_state(env).is_some_and(|state| state.frozen)
 }
 
 /// Returns the active global freeze reason, if draws are currently frozen.
@@ -141,7 +138,6 @@ pub fn get_draws_freeze_reason(env: &Env) -> Option<FreezeReason> {
 /// # Events
 /// Emits [`CreditLineFreezeEvent`] on `("credit", "line_frz")` with `frozen = true`.
 pub fn freeze_credit_line(env: Env, borrower: Address, reason: FreezeReason) {
-    require_admin_auth(&env);
     enforce_freeze_cooldown(&env);
     if get_credit_line(&env, &borrower).is_none() {
         env.panic_with_error(ContractError::CreditLineNotFound);
@@ -160,7 +156,6 @@ pub fn freeze_credit_line(env: Env, borrower: Address, reason: FreezeReason) {
 /// # Events
 /// Emits [`CreditLineFreezeEvent`] with `frozen = false` when a freeze record existed.
 pub fn unfreeze_credit_line(env: Env, borrower: Address) {
-    require_admin_auth(&env);
     enforce_freeze_cooldown(&env);
     let key = DataKey::CreditLineFreeze(borrower.clone());
     let Some(reason) = env
@@ -215,7 +210,7 @@ mod tests {
         env.mock_all_auths();
         let admin = Address::generate(env);
         let borrower = Address::generate(env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(env, &contract_id);
         client.init(&admin);
         client.open_credit_line(&borrower, &1_000, &300, &70);

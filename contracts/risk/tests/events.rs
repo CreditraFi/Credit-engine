@@ -35,9 +35,15 @@ fn test_events() {
     let event = events.last().unwrap();
     // event is a tuple (contract_id: Address, topics: Vec<Val>, data: Val)
     let topics = &event.1;
-    let data = event.2.clone();
-    assert_eq!(val_to_symbol(&env, topics.get(0).unwrap()), symbol_short!("risk"));
-    assert_eq!(val_to_symbol(&env, topics.get(1).unwrap()), symbol_short!("init"));
+    let data = event.2;
+    assert_eq!(
+        val_to_symbol(&env, topics.get(0).unwrap()),
+        symbol_short!("risk")
+    );
+    assert_eq!(
+        val_to_symbol(&env, topics.get(1).unwrap()),
+        symbol_short!("init")
+    );
     let ev: RiskInitializedEvent = data.try_into_val(&env).unwrap();
     assert_eq!(ev.admin, admin);
 
@@ -46,9 +52,15 @@ fn test_events() {
     let events = env.events().all();
     let event = events.last().unwrap();
     let topics = &event.1;
-    let data = event.2.clone();
-    assert_eq!(val_to_symbol(&env, topics.get(0).unwrap()), symbol_short!("risk"));
-    assert_eq!(val_to_symbol(&env, topics.get(1).unwrap()), symbol_short!("rad_cool"));
+    let data = event.2;
+    assert_eq!(
+        val_to_symbol(&env, topics.get(0).unwrap()),
+        symbol_short!("risk")
+    );
+    assert_eq!(
+        val_to_symbol(&env, topics.get(1).unwrap()),
+        symbol_short!("rad_cool")
+    );
     let ev: RiskAdminCooldownConfiguredEvent = data.try_into_val(&env).unwrap();
     assert_eq!(ev.cooldown_seconds, 3600);
 
@@ -57,11 +69,17 @@ fn test_events() {
     let events = env.events().all();
     let event = events.last().unwrap();
     let topics = &event.1;
-    let data = event.2.clone();
-    assert_eq!(val_to_symbol(&env, topics.get(0).unwrap()), symbol_short!("risk"));
-    assert_eq!(val_to_symbol(&env, topics.get(1).unwrap()), symbol_short!("paused"));
+    let data = event.2;
+    assert_eq!(
+        val_to_symbol(&env, topics.get(0).unwrap()),
+        symbol_short!("risk")
+    );
+    assert_eq!(
+        val_to_symbol(&env, topics.get(1).unwrap()),
+        symbol_short!("paused")
+    );
     let ev: RiskPausedEvent = data.try_into_val(&env).unwrap();
-    assert_eq!(ev.paused, true);
+    assert!(ev.paused);
 
     // Unpause then record action
     client.set_paused(&false);
@@ -69,9 +87,15 @@ fn test_events() {
     let events = env.events().all();
     let event = events.last().unwrap();
     let topics = &event.1;
-    let data = event.2.clone();
-    assert_eq!(val_to_symbol(&env, topics.get(0).unwrap()), symbol_short!("risk"));
-    assert_eq!(val_to_symbol(&env, topics.get(1).unwrap()), symbol_short!("rad_act"));
+    let data = event.2;
+    assert_eq!(
+        val_to_symbol(&env, topics.get(0).unwrap()),
+        symbol_short!("risk")
+    );
+    assert_eq!(
+        val_to_symbol(&env, topics.get(1).unwrap()),
+        symbol_short!("rad_act")
+    );
     let ev: RiskAdminActionRecordedEvent = data.try_into_val(&env).unwrap();
     // In the test environment timestamp defaults to 0.
     let _ = ev.timestamp;

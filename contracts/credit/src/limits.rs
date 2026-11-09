@@ -37,6 +37,7 @@ use soroban_sdk::{Address, Env};
 ///
 /// Returns `Err(ContractError::BorrowerExposureCapExceeded)` when
 /// `updated_utilized > cap`.
+#[allow(dead_code)]
 pub fn check_borrower_exposure_cap(
     env: &Env,
     borrower: &Address,

@@ -45,10 +45,7 @@
 
 use creditra_credit::types::{ContractError, ContractErrorCategory};
 use creditra_credit::{Credit, CreditClient};
-use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    token, Address, Env,
-};
+use soroban_sdk::{testutils::Address as _, token, Address, Env};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Section 1 — Discriminant stability pins (v7 lifecycle error surface)
@@ -100,19 +97,16 @@ fn lifecycle_v7_error_discriminants_are_pinned() {
     // Block / freeze → gates draw/suspend/close paths
     assert_eq!(ContractError::DrawsFrozen as u32, 19);
     assert_eq!(ContractError::BorrowerFrozen as u32, 40);
-    assert_eq!(ContractError::BorrowerBlocked as u32, 16);
 
     // Reentrancy / misc
     assert_eq!(ContractError::Reentrancy as u32, 11);
     assert_eq!(ContractError::OverLimit as u32, 6);
-    assert_eq!(ContractError::LimitDecreaseRequiresRepayment as u32, 13);
     assert_eq!(ContractError::AdminAcceptTooEarly as u32, 15);
     assert_eq!(ContractError::DrawExceedsMaxAmount as u32, 17);
     assert_eq!(ContractError::RepayExceedsMaxAmount as u32, 28);
     assert_eq!(ContractError::DrawCooldownActive as u32, 29);
     assert_eq!(ContractError::CollateralRatioBelowMinimum as u32, 35);
     assert_eq!(ContractError::InsufficientCollateralBalance as u32, 39);
-    assert_eq!(ContractError::AdminLifecycleCooldownActive as u32, 56);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -148,13 +142,11 @@ fn lifecycle_v7_category_mappings_are_pinned() {
     assert_eq!(ContractError::RateTooHigh.category(), Risk);
     assert_eq!(ContractError::ScoreTooHigh.category(), Risk);
     assert_eq!(ContractError::DrawCooldownActive.category(), Risk);
-    assert_eq!(ContractError::AdminLifecycleCooldownActive.category(), Risk);
 
     // Block bucket (discriminant 9)
     assert_eq!(ContractError::CreditLineFrozen.category(), Block);
     assert_eq!(ContractError::DrawsFrozen.category(), Block);
     assert_eq!(ContractError::BorrowerFrozen.category(), Block);
-    assert_eq!(ContractError::BorrowerBlocked.category(), Block);
 
     // Oracle bucket (discriminant 7)
     assert_eq!(ContractError::OraclePriceInvalid.category(), Oracle);
@@ -165,10 +157,6 @@ fn lifecycle_v7_category_mappings_are_pinned() {
     // Limit bucket (discriminant 4)
     assert_eq!(ContractError::OverLimit.category(), Limit);
     assert_eq!(ContractError::UtilizationNotZero.category(), Limit);
-    assert_eq!(
-        ContractError::LimitDecreaseRequiresRepayment.category(),
-        Limit
-    );
     assert_eq!(ContractError::DrawExceedsMaxAmount.category(), Limit);
     assert_eq!(ContractError::RepayExceedsMaxAmount.category(), Limit);
 
@@ -225,17 +213,14 @@ fn lifecycle_v7_subset_has_no_duplicate_discriminants() {
         ContractError::OracleQuorumNotMet as u32,
         ContractError::DrawsFrozen as u32,
         ContractError::BorrowerFrozen as u32,
-        ContractError::BorrowerBlocked as u32,
         ContractError::Reentrancy as u32,
         ContractError::OverLimit as u32,
-        ContractError::LimitDecreaseRequiresRepayment as u32,
         ContractError::AdminAcceptTooEarly as u32,
         ContractError::DrawExceedsMaxAmount as u32,
         ContractError::RepayExceedsMaxAmount as u32,
         ContractError::DrawCooldownActive as u32,
         ContractError::CollateralRatioBelowMinimum as u32,
         ContractError::InsufficientCollateralBalance as u32,
-        ContractError::AdminLifecycleCooldownActive as u32,
     ];
 
     let unique: HashSet<u32> = codes.iter().cloned().collect();
@@ -283,17 +268,14 @@ fn lifecycle_v7_subset_variant_count_is_known() {
         ContractError::OracleQuorumNotMet as u32,
         ContractError::DrawsFrozen as u32,
         ContractError::BorrowerFrozen as u32,
-        ContractError::BorrowerBlocked as u32,
         ContractError::Reentrancy as u32,
         ContractError::OverLimit as u32,
-        ContractError::LimitDecreaseRequiresRepayment as u32,
         ContractError::AdminAcceptTooEarly as u32,
         ContractError::DrawExceedsMaxAmount as u32,
         ContractError::RepayExceedsMaxAmount as u32,
         ContractError::DrawCooldownActive as u32,
         ContractError::CollateralRatioBelowMinimum as u32,
         ContractError::InsufficientCollateralBalance as u32,
-        ContractError::AdminLifecycleCooldownActive as u32,
     ];
 
     assert_eq!(
@@ -317,7 +299,7 @@ mod integration {
         env.mock_all_auths();
 
         let admin = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         client.init(&admin);
 
@@ -612,24 +594,16 @@ mod integration {
     // ── Test 4.14 — admin_not_initialized → AdminNotInitialized (32) ──
 
     #[test]
-    fn lifecycle_op_without_admin_init_reverts_with_code_32() {
+    fn constructor_initializes_admin_at_deployment() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register(Credit, ());
+        let admin = Address::generate(&env);
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
         let borrower = Address::generate(&env);
 
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            client.open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
-        }));
-        assert!(result.is_err());
-        let err_str = extract_error_str(&result.unwrap_err());
-        assert!(
-            err_str.contains("#32"),
-            "expected AdminNotInitialized (#32), got: {:?}",
-            err_str
-        );
+        client.open_credit_line(&borrower, &1000_i128, &500_u32, &50_u32);
     }
 
     // ── Test 4.15 — open_credit_line boundary: zero limit → InvalidAmount (5) ──

@@ -51,7 +51,7 @@ fn setup_defaulted_borrower(
     env.mock_all_auths();
     let admin = Address::generate(env);
     let borrower = Address::generate(env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(env, &contract_id);
     client.init(&admin);
 
@@ -115,7 +115,7 @@ proptest! {
 
         // ── Setup ──────────────────────────────────────────────────────────
         let env = Env::default();
-        env.ledger().set_timestamp(100_000);
+        env.ledger().with_mut(|l| l.timestamp = 100_000);
         let (client, borrower) = setup_defaulted_borrower(&env, credit_limit, utilized);
 
         // ── Snapshot before ────────────────────────────────────────────────

@@ -89,11 +89,11 @@ impl Ctx {
 fn setup() -> Ctx {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
-    env.ledger().set_timestamp(T0);
+    env.ledger().with_mut(|l| l.timestamp = T0);
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let token_id = env.register_stellar_asset_contract_v2(Address::generate(&env));
     let token_address = token_id.address();
 
@@ -233,21 +233,21 @@ proptest! {
         );
 
         // ── One second before the due date: not delinquent ──
-        ctx.env.ledger().set_timestamp(first_due.saturating_sub(1).max(T0));
+        ctx.env.ledger().with_mut(|l| l.timestamp = first_due.saturating_sub(1).max(T0));
         prop_assert!(
             !ctx.client().is_delinquent(&ctx.borrower),
             "should NOT be delinquent one second before due date"
         );
 
         // ── Exactly at the due date: not delinquent ──
-        ctx.env.ledger().set_timestamp(first_due);
+        ctx.env.ledger().with_mut(|l| l.timestamp = first_due);
         prop_assert!(
             !ctx.client().is_delinquent(&ctx.borrower),
             "should NOT be delinquent exactly at due date"
         );
 
         // ── One second past the due date: delinquent ──
-        ctx.env.ledger().set_timestamp(first_due + 1);
+        ctx.env.ledger().with_mut(|l| l.timestamp = first_due + 1);
         prop_assert!(
             ctx.client().is_delinquent(&ctx.borrower),
             "should be delinquent one second past due date"
@@ -331,7 +331,7 @@ proptest! {
         let first_due = T0 + period_seconds;
 
         // Advance the ledger so interest accrues.
-        ctx.env.ledger().set_timestamp(T0 + elapsed_secs);
+        ctx.env.ledger().with_mut(|l| l.timestamp = T0 + elapsed_secs);
 
         ctx.client().set_repayment_schedule(
             &ctx.borrower,
@@ -359,12 +359,13 @@ proptest! {
         prop_assert_eq!(
             schedule.next_due_ts,
             expected,
-            "contract={} model={} \
-             (amount_per_period={amount_per_period}, period_seconds={period_seconds}, \
-              elapsed_secs={elapsed_secs}, repay={repay}, accrued={accrued}, \
-              effective_repay={effective_repay}, interest_repaid={interest_repaid}, \
-              principal_repaid={principal_repaid})",
-            schedule.next_due_ts, expected,
+            "contract={} model={} (amount_per_period={}, period_seconds={}, elapsed_secs={}, repay={})",
+            schedule.next_due_ts,
+            expected,
+            amount_per_period,
+            period_seconds,
+            elapsed_secs,
+            repay,
         );
     }
 
@@ -580,7 +581,9 @@ mod edge_cases {
         let ctx = setup();
 
         // Jump far into the future.
-        ctx.env.ledger().set_timestamp(T0 + 10 * SECONDS_PER_YEAR);
+        ctx.env
+            .ledger()
+            .with_mut(|l| l.timestamp = T0 + 10 * SECONDS_PER_YEAR);
 
         assert!(
             !ctx.client().is_delinquent(&ctx.borrower),
@@ -605,7 +608,9 @@ mod edge_cases {
         ctx.client().repay_credit(&ctx.borrower, &DRAW_AMOUNT);
 
         // Advance past the due date.
-        ctx.env.ledger().set_timestamp(first_due + 5_000);
+        ctx.env
+            .ledger()
+            .with_mut(|l| l.timestamp = first_due + 5_000);
 
         assert!(
             !ctx.client().is_delinquent(&ctx.borrower),

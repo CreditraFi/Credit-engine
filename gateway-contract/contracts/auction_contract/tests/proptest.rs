@@ -1,8 +1,7 @@
 #![cfg(test)]
 
 use proptest::prelude::*;
-use soroban_sdk::testutils::{Address as _, Ledger};
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{Env, Symbol};
 
 use gateway_auction::{
     Auction, AuctionClient, AuctionMode, AuctionState, AuctionStatus, DutchAuctionDecay,
@@ -26,7 +25,7 @@ proptest! {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, Auction);
+        let contract_id = env.register(Auction, ());
         let client = AuctionClient::new(&env, &contract_id);
 
         let auction_id = Symbol::new(&env, "prop_auc");
@@ -56,7 +55,7 @@ proptest! {
             &min_increment_bps,
             &d_start,
             &d_floor,
-            &Some(decay.clone()),
+            &decay.clone(),
             &d_steps,
         );
 
@@ -84,7 +83,7 @@ proptest! {
             let fp = state.config.dutch_floor_price.unwrap();
             assert!(sp >= fp);
             assert!(sp >= state.config.min_bid);
-            
+
             if state.config.dutch_decay == DutchAuctionDecay::Stepped {
                 assert!(state.config.dutch_step_count.unwrap() > 0);
             }

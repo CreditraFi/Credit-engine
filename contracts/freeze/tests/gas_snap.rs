@@ -18,7 +18,7 @@
 
 use creditra_freeze::{Credit, CreditClient, FreezeReason};
 use soroban_sdk::{
-    testutils::{budget::Budget, Address as _, Ledger},
+    testutils::{budget::Budget, Address as _},
     Address, Env,
 };
 
@@ -26,6 +26,7 @@ use soroban_sdk::{
 
 /// Single entrypoint gas snapshot, serialised by `insta` for regression tracking.
 #[derive(Debug)]
+#[allow(dead_code)]
 struct FreezeGasSample {
     entrypoint: &'static str,
     cpu_instructions: u64,
@@ -61,7 +62,7 @@ fn setup() -> (Env, CreditClient<'static>, Address, Address) {
     env.mock_all_auths_allowing_non_root_auth();
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
     client.init(&admin);
     client.open_credit_line(&borrower, &1_000_000_i128, &300_u32, &50_u32);
@@ -76,14 +77,14 @@ fn setup() -> (Env, CreditClient<'static>, Address, Address) {
 fn gas_freeze_draws() {
     let (env, client, _admin, _borrower) = setup();
     snap("freeze_draws", &env, || {
-        client.freeze_draws();
+        client.freeze_draws(&FreezeReason::LiquidityReserve);
     });
 }
 
 #[test]
 fn gas_unfreeze_draws() {
     let (env, client, _admin, _borrower) = setup();
-    client.freeze_draws();
+    client.freeze_draws(&FreezeReason::LiquidityReserve);
     snap("unfreeze_draws", &env, || {
         client.unfreeze_draws();
     });

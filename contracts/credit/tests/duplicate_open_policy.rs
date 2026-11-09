@@ -33,7 +33,7 @@ mod test_helpers {
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
 
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = creditra_credit::CreditClient::new(&env, &contract_id);
 
         client.init(&admin);

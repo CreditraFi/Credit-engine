@@ -106,7 +106,7 @@ fn test_rate_and_score_boundary_validation() {
 
         let admin = Address::generate(&env);
         let borrower = Address::generate(&env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(&env, &contract_id);
 
         client.init(&admin);
@@ -182,7 +182,7 @@ fn test_rate_score_edge_cases() {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);
@@ -231,7 +231,7 @@ fn test_error_mapping_consistency() {
 
     let admin = Address::generate(&env);
     let borrower = Address::generate(&env);
-    let contract_id = env.register(Credit, ());
+    let contract_id = env.register(Credit, (admin.clone(),));
     let client = CreditClient::new(&env, &contract_id);
 
     client.init(&admin);

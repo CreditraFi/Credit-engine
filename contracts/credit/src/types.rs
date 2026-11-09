@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#![allow(unexpected_cfgs)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![cfg_attr(coverage_nightly, coverage(off))]
 
@@ -655,6 +656,29 @@ pub struct BorrowCapabilities {
     /// Whether the borrower can self-suspend their credit line. True
     /// only when the credit line exists and is currently Active.
     pub can_self_suspend: bool,
+}
+
+/// Read-only capabilities bitmap for the accrual (v7) subsystem.
+///
+/// Returned by [`crate::views::accrual_capabilities`]. All fields are pure
+/// boolean flags derived from protocol and per-borrower state; no state is
+/// mutated.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccrualCapabilities {
+    /// `true` when `accrue_batch` will capitalize interest for this borrower:
+    /// the credit line exists, is `Active`, has `utilized_amount > 0`, and the
+    /// protocol is not paused.
+    pub can_accrue: bool,
+    /// `true` when the protocol is accepting new `accrue_batch` submissions
+    /// (i.e. the circuit breaker is not engaged).
+    pub batch_open: bool,
+    /// `true` when a positive `penalty_surcharge_bps` is configured and the
+    /// borrower is currently delinquent.
+    pub penalty_rate_active: bool,
+    /// `true` when a `GracePeriodConfig` is set and the current ledger
+    /// timestamp is within the borrower's grace window.
+    pub grace_waiver_active: bool,
 }
 
 /// Read-only capabilities bitmap for a credit line's lifecycle transitions (v7).

@@ -45,7 +45,7 @@ mod debt_monotonic {
         env.mock_all_auths();
         let admin = Address::generate(env);
         let borrower = Address::generate(env);
-        let contract_id = env.register(Credit, ());
+        let contract_id = env.register(Credit, (admin.clone(),));
         let client = CreditClient::new(env, &contract_id);
         client.init(&admin);
 
@@ -184,7 +184,7 @@ mod debt_monotonic {
     fn debt_monotonic_with_simulated_interest_accrual() {
         use soroban_sdk::testutils::Ledger;
         let env = Env::default();
-        env.ledger().set_timestamp(1_000);
+        env.ledger().with_mut(|l| l.timestamp = 1_000);
         let (client, contract_id, _admin, borrower, _token) = setup_initialized_contract(&env);
 
         client.open_credit_line(&borrower, &10_000, &500_u32, &70_u32);
@@ -243,7 +243,7 @@ mod debt_monotonic {
 
         // Simulate more interest accrual — advance time first so apply_accrual
         // doesn't recalculate and overwrite the injected value.
-        env.ledger().set_timestamp(2_000);
+        env.ledger().with_mut(|l| l.timestamp = 2_000);
         env.as_contract(&contract_id, || {
             let mut line: CreditLineData = env.storage().persistent().get(&borrower).unwrap();
             let interest_added = 500 - line.accrued_interest;

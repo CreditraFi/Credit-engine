@@ -9,8 +9,8 @@ use crate::storage::{
     is_paused, MAX_ENUMERATION_LIMIT,
 };
 use crate::types::{
-    BorrowCapabilities, BorrowStateSnapshot, CreditLineSnapshot, CreditLinesPage, ProofOfReserve,
-    ProtocolSummaryView,
+    AccrualCapabilities, BorrowCapabilities, BorrowStateSnapshot, CreditLineSnapshot,
+    CreditLinesPage, CreditStatus, ProofOfReserve, ProtocolSummaryView,
 };
 use soroban_sdk::{Address, Env, Vec};
 
@@ -191,7 +191,7 @@ pub fn get_credit_lines_paginated(env: Env, cursor: Option<u32>, limit: u32) -> 
     let end_id = total_count.saturating_sub(1);
 
     // Iterate through IDs until we collect enough results or reach the end
-    while credit_lines.len() < limit as u32 && current_id <= end_id {
+    while credit_lines.len() < limit && current_id <= end_id {
         if let Some(borrower) = get_borrower_by_credit_line_id(&env, current_id) {
             if let Some(line) = get_credit_line(&env, &borrower) {
                 credit_lines.push_back(line);
@@ -199,7 +199,7 @@ pub fn get_credit_lines_paginated(env: Env, cursor: Option<u32>, limit: u32) -> 
         }
 
         // Prepare next cursor if we might have more results
-        if credit_lines.len() < limit as u32 && current_id < end_id {
+        if credit_lines.len() < limit && current_id < end_id {
             next_cursor = Some(current_id.saturating_add(1));
         } else if current_id < end_id {
             // We've filled the page but there are more results
@@ -210,7 +210,7 @@ pub fn get_credit_lines_paginated(env: Env, cursor: Option<u32>, limit: u32) -> 
     }
 
     // If we didn't fill the page, there are no more results
-    if credit_lines.len() < limit as u32 {
+    if credit_lines.len() < limit {
         next_cursor = None;
     }
 
@@ -256,5 +256,57 @@ pub fn get_borrow_state(env: Env, borrower: Address) -> BorrowStateSnapshot {
         credit_line,
         collateral_balance,
         capabilities,
+    }
+}
+
+// ── Accrual capabilities view (v7) ───────────────────────────────────────────
+
+/// Return the accrual-subsystem capabilities bitmap for a borrower.
+///
+/// This is a read-only, no-auth view that reports which accrual-related
+/// operations are currently available for a given borrower, without
+/// executing any state-mutating logic.
+///
+/// # Security
+/// Pure read-only query. No authentication required. No state mutations occur.
+pub fn accrual_capabilities(env: Env, borrower: Address) -> AccrualCapabilities {
+    let paused = is_paused(&env);
+    let batch_open = !paused;
+
+    let credit_line = get_credit_line(&env, &borrower);
+
+    let can_accrue = credit_line
+        .as_ref()
+        .map(|line| !paused && line.status == CreditStatus::Active && line.utilized_amount > 0)
+        .unwrap_or(false);
+
+    let penalty_surcharge_bps = crate::storage::get_penalty_surcharge_bps(&env);
+    let penalty_rate_active = if penalty_surcharge_bps > 0 {
+        crate::query::is_delinquent(env.clone(), borrower.clone())
+    } else {
+        false
+    };
+
+    let grace_waiver_active = credit_line
+        .as_ref()
+        .map(|line| {
+            if line.status != CreditStatus::Suspended {
+                return false;
+            }
+            match crate::storage::get_grace_period_config(&env) {
+                Some(cfg) if cfg.grace_period_seconds > 0 => {
+                    let now = env.ledger().timestamp();
+                    now <= line.suspension_ts.saturating_add(cfg.grace_period_seconds)
+                }
+                _ => false,
+            }
+        })
+        .unwrap_or(false);
+
+    AccrualCapabilities {
+        can_accrue,
+        batch_open,
+        penalty_rate_active,
+        grace_waiver_active,
     }
 }

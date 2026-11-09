@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#![allow(unexpected_cfgs)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![cfg_attr(coverage_nightly, coverage(off))]
 
@@ -455,8 +456,6 @@ pub fn publish_borrower_frozen_event(env: &Env, borrower: &Address, frozen_until
         },
     );
 }
-
-/// Publish a penalty rate entered event when a line becomes delinquent.
 
 /// Publish a penalty rate entered event when a line becomes delinquent.
 pub fn publish_penalty_rate_entered_event(
