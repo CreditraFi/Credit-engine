@@ -355,3 +355,13 @@ python3 scripts/list_contract_errors.py --json | jq 'length'   # 38
 ---
 
 *For the long-form protocol description, start with [`WHITEPAPER.md`](./WHITEPAPER.md).*
+
+---
+
+
+## Maintainers
+
+| Role | Contact |
+| --- | --- |
+| Maintainer | [`sulaimonifeoluwa4-blip`](https://github.com/sulaimonifeoluwa4-blip) |
+| Community channel | https://t.me/+N9ZmMAjKnCpjZWI8 |
